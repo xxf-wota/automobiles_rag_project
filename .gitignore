@@ -1,0 +1,8 @@
+# 前端忽略
+rag_app/node_modules/
+rag_app/dist/
+
+# 后端忽略
+fastapi/target/
+fastapi/build/
+fastapi/.env
