@@ -1,8 +1,13 @@
-# 前端忽略
-rag_app/node_modules/
-rag_app/dist/
+# 环境变量文件（核心）
+.env
+.env.local
+.env.*.local
 
-# 后端忽略
-fastapi/target/
-fastapi/build/
-fastapi/.env
+# 依赖目录（减少体积，避免冗余）
+node_modules/
+venv/
+__pycache__/
+
+# 系统文件
+.DS_Store
+Thumbs.db
