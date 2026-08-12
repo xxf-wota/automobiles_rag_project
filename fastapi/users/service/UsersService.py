@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from common import RedisUtil, MySQLUtil
 from users.dao import UsersDao
 from users.entity.UsersEntity import UsersEntity
+from utils.JWTUtil import create_access_token
 
 load_dotenv()
 
@@ -111,6 +112,17 @@ def check_code(email: str, code: str):
                 "data": None
             }
         # 当验证码正确时，给用户邮箱发送提醒邮件并返回成功信息
+        # 从数据库中查询用户信息
+        user_data = UsersDao.query_user_by_email(email)
+        # 生成JWT Token
+        user_id = user_data[0]["user_id"]
+        username = user_data[0]["username"]
+        token = create_access_token({
+            "user_id": user_id,
+            "email": email,
+            "username": username
+        })
+
         # 配置发送信息
         sender = os.getenv("SENDER_EMAIL") # 发送邮箱号
         sender_pwd = os.getenv("SENDER_EMAIL_PASSWORD") # 授权码
@@ -137,10 +149,17 @@ def check_code(email: str, code: str):
         smtp.sendmail(sender, email, message.as_string())
         # 关闭邮箱连接
         smtp.quit()
+
         return {
             "code": 200,
             "msg": "登录成功，已发送提醒邮件到您的邮箱号",
-            "data": None
+            "data": {
+                "access_token": token,
+                "token_type": "bearer",
+                "user_id": user_id,
+                "email": email,
+                "username": username
+            }
         }
 
     except Exception as e:
@@ -155,51 +174,77 @@ def check_code(email: str, code: str):
 def email_password(email: str, password: str):
     # 要验证邮箱号和密码是否正确，需要从数据库中查询用户信息
 
-    results = UsersDao.query_user_by_email(email)
+    user_data = UsersDao.query_user_by_email(email)
     # 当查询结果为一个空元组时，说明邮箱号不存在
-    if isinstance(results, tuple):
+    if isinstance(user_data, tuple):
         return {
             "code": 400,
             "msg": "邮箱号不存在，请先注册",
             "data": None
         }
-    if results[0]["password"] != password:
+    if user_data[0]["password"] != password:
         return {
             "code": 400,
             "msg": "密码错误，请重新输入",
             "data": None
         }
     # 若邮箱号和密码都正确，返回成功信息
-    # 发送提醒邮件到用户邮箱号
-    # 配置发送信息
-    sender = os.getenv("SENDER_EMAIL") # 发送邮箱号
-    sender_pwd = os.getenv("SENDER_EMAIL_PASSWORD") # 授权码
-    subject = "登录成功" # 邮件主题
-    context = f"您已成功登录，欢迎来到我们的平台，若不是您操作，请及时冻结账号" # 邮件内容
-    message = MIMEText(context, "plain", "utf-8")
-    # 添加邮箱内容
-    message["From"] = sender
-    message["To"] = email
-    message["Subject"] = subject
-    # 构建发送邮箱对象
-    smtp = smtplib.SMTP(
-        host=os.getenv("SMTP_HOST"),
-        port=int(os.getenv("SMTP_PORT")),
-    )
-    # 开启邮箱发送服务 TLS
-    smtp.starttls()
-    # 验证发送方和授权码是否正确
-    smtp.login(sender, sender_pwd)
-    # 发送邮件
-    smtp.sendmail(sender, email, message.as_string())
-    # 关闭邮箱连接
-    smtp.quit()
-    # 返回成功信息
-    return {
-        "code": 200,
-        "msg": "登录成功，已发送提醒邮件到您的邮箱号",
-        "data": None
-    }
+
+
+
+    try:
+        # 生成JWT Token
+        user_id = user_data[0]["user_id"]
+        username = user_data[0]["username"]
+        token = create_access_token({
+            "user_id": user_id,
+            "email": email,
+            "username": username
+        })
+
+        # 发送提醒邮件到用户邮箱号
+        # 配置发送信息
+        sender = os.getenv("SENDER_EMAIL") # 发送邮箱号
+        sender_pwd = os.getenv("SENDER_EMAIL_PASSWORD") # 授权码
+        subject = "登录成功" # 邮件主题
+        context = f"您已成功登录，欢迎来到我们的平台，若不是您操作，请及时冻结账号" # 邮件内容
+        message = MIMEText(context, "plain", "utf-8")
+        # 添加邮箱内容
+        message["From"] = sender
+        message["To"] = email
+        message["Subject"] = subject
+        # 构建发送邮箱对象
+        smtp = smtplib.SMTP(
+            host=os.getenv("SMTP_HOST"),
+            port=int(os.getenv("SMTP_PORT")),
+        )
+        # 开启邮箱发送服务 TLS
+        smtp.starttls()
+        # 验证发送方和授权码是否正确
+        smtp.login(sender, sender_pwd)
+        # 发送邮件
+        smtp.sendmail(sender, email, message.as_string())
+        # 关闭邮箱连接
+        smtp.quit()
+        # 返回成功信息
+        return {
+            "code": 200,
+            "msg": "登录成功，已发送提醒邮件到您的邮箱号",
+            "data": {
+                "access_token": token,
+                "token_type": "bearer",
+                "user_id": user_id,
+                "email": email,
+                "username": username
+            }
+        }
+    except Exception as e:
+        return {
+            "code": 400,
+            "msg": "系统错误，登录请稍后重试",
+            "data": None
+        }
+
 
 
 
@@ -227,6 +272,18 @@ def register(usersEntity: UsersEntity):
         # 若验证码正确调用插入数据库方法
         result = UsersDao.insert_user(usersEntity)
         if result == "插入用户成功":
+            # 查询新用户信息
+            user_data = UsersDao.query_user_by_email(usersEntity.email)
+            user_id = user_data[0]["user_id"]
+
+            # 生成JWT Token
+            token = create_access_token({
+                "user_id": user_id,
+                "email": usersEntity.email,
+                "username": usersEntity.username
+            })
+
+
             # 注册成功后，给用户邮箱发送提醒邮件
             # 配置发送信息
             sender = os.getenv("SENDER_EMAIL")  # 发送邮箱号
@@ -254,8 +311,15 @@ def register(usersEntity: UsersEntity):
             return {
                 "code": 200,
                 "msg": "注册成功，已发送提醒邮件到您的邮箱号",
-                "data": None
+                "data": {
+                    "access_token": token,
+                    "token_type": "bearer",
+                    "user_id": user_id,
+                    "email": usersEntity.email,
+                    "username": usersEntity.username
+                }
             }
+
         return {
             "code": 400,
             "msg": result,

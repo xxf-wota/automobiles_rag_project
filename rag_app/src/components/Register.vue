@@ -18,6 +18,7 @@
 import {ref, getCurrentInstance, onMounted} from "vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
+import {setToken} from "../utils/auth";
 
 let email = ref("")
 let password = ref("")
@@ -60,6 +61,8 @@ function register() {
         })
     }).then(res => {
         if (res.data.code === 200) {
+            // 注册成功也会返回 JWT token，保存用于自动登录
+            setToken(res.data.data.access_token)
             ElMessage.info(res.data.msg)
             setTimeout(() => {
                 router.push("/chat")

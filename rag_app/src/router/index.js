@@ -1,5 +1,6 @@
 // 引入路由配置
 import { createRouter, createWebHistory } from 'vue-router'
+import { getToken } from '../utils/auth'
 
 // 定义路由配置对象 --- 数组
 const routes = [
@@ -14,7 +15,12 @@ const routes = [
   {
     path: '/loginPassword', // 登录密码页
     component: () => import('../components/LoginPassword.vue')
+  },
+  {
+    path: '/chat', // 聊天页
+    component: () => import('../components/Chat.vue')
   }
+
 ]
 
 
@@ -22,6 +28,15 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 全局前置守卫：未登录不能访问聊天页，自动跳回登录页
+router.beforeEach((to, from, next) => {
+  if (to.path === '/chat' && !getToken()) {
+    next('/')
+  } else {
+    next()
+  }
 })
 
 // 导出路由实例

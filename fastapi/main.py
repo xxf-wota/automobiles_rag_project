@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
 
-import uvicorn
 from fastapi import FastAPI
 import uvicorn as uv
+
+from chat.controller.ChatController import chat_router
 from users.controller.UsersController import users_router
+
 # 生命周期配置
 @asynccontextmanager
 async def start_end_run(app):
@@ -15,11 +17,18 @@ async def start_end_run(app):
 
 app = FastAPI(lifespan=start_end_run)
 
-# 注册路由
+# 注册users路由
 app.include_router(
     router=users_router, # 需要注册的路由
     prefix="/users", # 路由前缀
     tags=["users"] # swagger 路由标签
+   )
+
+# 注册chat路由
+app.include_router(
+    router=chat_router, # 需要注册的路由
+    prefix="/chat", # 路由前缀
+    tags=["chat"] # swagger 路由标签
    )
 
 

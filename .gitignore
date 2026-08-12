@@ -16,3 +16,12 @@ venv/
 
 # 系统
 .DS_Store
+
+
+# 忽略 create_data 文件夹下的指定 CSV 文件
+fastapi/create_data/懂车帝1.csv
+fastapi/create_data/汽车之家.csv
+
+
+# 忽略向量数据库文件
+fastapi/automobiles_chroma
