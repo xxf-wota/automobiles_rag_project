@@ -1,69 +1,169 @@
 <template>
-    <!-- 聊天框 -->
-    <div style="border: 1px solid #000; width: 800px; height: 700px; margin: 0 auto; position: relative; display: flex; flex-direction: column;">
-        <!-- 消息列表区域 -->
-        <div style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column;">
-            <!-- 如果没有消息，显示提示 -->
-            <div v-if="messages.length === 0" style="text-align: center; color: #999; margin-top: 200px;">
-                开始对话吧！
+    <!-- 聊天整体容器：左侧历史记录侧边栏 + 右侧聊天区 -->
+    <div class="chat-shell">
+        <!-- ==================== 左侧侧边栏 ==================== -->
+        <aside class="sidebar">
+            <!-- 品牌标题 -->
+            <div class="sidebar-brand">
+                <div class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 13l1.5-4.5A2 2 0 0 1 8.4 7h7.2a2 2 0 0 1 1.9 1.5L19 13" />
+                        <path d="M3 13h18a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z" />
+                        <circle cx="7" cy="18" r="1.6" />
+                        <circle cx="17" cy="18" r="1.6" />
+                    </svg>
+                </div>
+                <h1>汽车问答智能助手</h1>
             </div>
 
-            <!-- 遍历显示所有消息 -->
-            <div v-for="(msg, index) in messages" :key="index"
-                 :style="{
-                     maxWidth: '70%',
-                     padding: '10px 15px',
-                     marginBottom: '10px',
-                     borderRadius: '10px',
-                     wordWrap: 'break-word',
-                     alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                     backgroundColor: msg.role === 'user' ? '#95ec69' : '#f0f0f0',
-                     border: msg.role === 'user' ? '1px solid #7ecf5a' : '1px solid #ddd'
-                 }">
-                {{ msg.content }}
-            </div>
-        </div>
-
-        <!-- 底部输入框和发送按钮 -->
-        <div style="border-top: 1px solid #ddd; padding: 10px; display: flex; gap: 10px; background: #fff;">
-            <input
-                type="text"
-                placeholder="请输入问题"
-                :disabled="isChat"
-                v-model="question"
-                @keyup.enter="chat"
-                style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; outline: none;"
-                :style="{ background: isChat ? '#f5f5f5' : '#fff' }"
-            >
-            <button
-                type="button"
-                @click="chat"
-                :disabled="isChat"
-                style="padding: 8px 20px; background: #409eff; color: #fff; border: none; border-radius: 4px; cursor: pointer;"
-                :style="{ background: isChat ? '#a0cfff' : '#409eff', cursor: isChat ? 'not-allowed' : 'pointer' }"
-            >
-                {{ isChat ? '生成中...' : '发送' }}
+            <!-- 新对话按钮 -->
+            <button type="button" class="new-chat-btn" @click="newChat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                </svg>
+                新对话
             </button>
-        </div>
+
+            <!-- 搜索框 -->
+            <div class="search-box">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M20 20l-3.5-3.5" />
+                </svg>
+                <input
+                    type="text"
+                    v-model="searchKeyword"
+                    placeholder="搜索历史记录"
+                    @keyup.enter="searchParentHistory"
+                >
+                <span v-if="searchKeyword" class="search-clear" @click="clearHistoryList">×</span>
+            </div>
+
+            <!-- 历史记录列表 -->
+            <div class="history-list">
+                <p class="history-label">历史记录</p>
+
+                <div
+                    v-for="item in filteredHistory"
+                    :key="item.id"
+                    class="history-item"
+                >
+                    <div class="history-main">
+                        <p class="history-title" @click="conversationLog(item.id)">{{ item.title }}</p>
+                        <p class="history-time" @click="conversationLog(item.id)">{{ item.time }}</p>
+                    </div>
+                    <button
+                        type="button"
+                        class="history-delete"
+                        title="删除记录"
+                        @click="deleteConversation(item.id)"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- 搜索无结果 -->
+                <div v-if="filteredHistory.length === 0" class="history-empty">
+                    <p>没有找到相关记录</p>
+                </div>
+            </div>
+
+            <!-- 底部用户信息 -->
+            <div class="sidebar-user">
+                <div class="user-avatar">{{ username.charAt(0) }}</div>
+                <div class="user-meta">
+                    <p class="user-name">{{ username }}</p>
+                    <p class="user-role">{{ isOnline ? '在线' : '离线' }}</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ==================== 右侧聊天区 ==================== -->
+        <main class="chat-area">
+            <!-- 消息列表区域 -->
+            <div class="message-list">
+                <!-- 默认问候语 -->
+                <div v-if="messages.length === 0" class="welcome">
+                    <div class="welcome-mark">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 13l1.5-4.5A2 2 0 0 1 8.4 7h7.2a2 2 0 0 1 1.9 1.5L19 13" />
+                            <path d="M3 13h18a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z" />
+                            <circle cx="7" cy="18" r="1.6" />
+                            <circle cx="17" cy="18" r="1.6" />
+                        </svg>
+                    </div>
+                    <p class="welcome-text">你好，{{ username }}</p>
+                    <p class="welcome-sub">有什么汽车方面的问题可以问我</p>
+                </div>
+
+                <!-- 遍历显示所有消息 -->
+                <div
+                    v-for="(msg, index) in messages"
+                    :key="index"
+                    class="message"
+                    :class="msg.role"
+                >
+                    <div class="avatar">{{ msg.role === 'user' ? '我' : 'AI' }}</div>
+                    <div class="bubble">{{ msg.content }}</div>
+                </div>
+            </div>
+
+            <!-- 底部输入框和发送按钮 -->
+            <div class="input-bar">
+                <div class="input-wrap">
+                    <input
+                        type="text"
+                        placeholder="请输入你的汽车问题"
+                        :disabled="isChat"
+                        v-model="question"
+                        @keyup.enter="chat"
+                    >
+                </div>
+                <button
+                    type="button"
+                    class="send-btn"
+                    @click="chat"
+                    :disabled="isChat"
+                >
+                    <template v-if="!isChat">发送</template>
+                    <template v-else><span class="dot"></span>生成中</template>
+                </button>
+            </div>
+        </main>
     </div>
 </template>
 
 <script setup>
-import {ref, onUnmounted} from "vue";
+import {ref, computed, getCurrentInstance, onMounted, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
-import {getToken, removeToken} from "../utils/auth";
+import {getUsername, getToken, removeToken, getUserId} from "../utils/auth";
 
+// ==================== 聊天业务 ====================
 // 定义聊天状态，false表示没有聊天，可以输入问题
 let isChat = ref(false)
 // 定义用户问题
 let question = ref("")
 // 用于接收服务器返回的回答
 let messages = ref([])
+// 定义用户是否在线
+let isOnline = ref(false)
+if (getToken()) {
+    isOnline.value = true
+}
+
+// 代理对象，用于发送axios请求
+let proxy = getCurrentInstance().proxy
 // 路由对象，登录过期时跳转登录页
 let router = useRouter()
 // 保存当前请求的 AbortController，用于中止流式请求
 let abortController = null
+
+
+// 用来保存当前聊天记录的id
+const currentChatId = ref(0)
 
 // chat函数，发送问题，并更新聊天状态
 // 使用 fetch + ReadableStream 实现 SSE，可以在请求头中携带 JWT
@@ -71,7 +171,7 @@ let abortController = null
 async function chat() {
     isChat.value = true
     let myQuestion = question.value.trim() // 去掉首尾空格
-    question.value = "" // 清空输入框
+    question.value = "" // 将问题内容赋值给myQuestion后，清空输入框
 
     // 判断是否输入了数据
     if (myQuestion.length === 0) {
@@ -88,11 +188,12 @@ async function chat() {
     if (abortController) {
         abortController.abort()
     }
-    abortController = new AbortController()
+    abortController = new AbortController() // 创建新的 AbortController
 
-    // 拼接请求地址
+    // 拼接请求地址，注意后端端口是 8000
     let urlSearchParams = new URLSearchParams({
-        question: myQuestion
+        question: myQuestion,
+        historyId: currentChatId.value // 需要多轮对话，所以需要传递历史记录id
     })
     let url = "http://localhost:8000/chat/chat?" + urlSearchParams.toString()
 
@@ -112,7 +213,9 @@ async function chat() {
         if (response.status === 401) {
             removeToken() // 删除过期的 token
             ElMessage.error("登录已过期，请重新登录")
-            router.push("/")
+            setTimeout(() => {
+                router.push("/")
+            }, 1000)
             isChat.value = false
             return
         }
@@ -140,7 +243,6 @@ async function chat() {
 
             // 6. 按 SSE 分隔符 \n\n 拆分成完整事件
             let index
-            // 当搜索到的 \n\n 是缓冲区中的最后一个字符时，说明是最后一个事件，跳出循环
             while ((index = buffer.indexOf("\n\n")) !== -1) {
                 // 提取当前事件文本，从开始0下标到搜索到的 \n\n 下标
                 let eventText = buffer.slice(0, index)
@@ -160,8 +262,6 @@ async function chat() {
                 if (!payload) continue // 如果 payload 为空，跳过
 
                 // 解析 JSON 字符串
-                // 后端传过来的时候是"data: {json.dumps({'content': chunk})}\n\n"
-                // 解析后是{"content": chunk}
                 let parsed
                 try {
                     parsed = JSON.parse(payload)
@@ -175,6 +275,8 @@ async function chat() {
                 // 7. 处理结束标识 [DONE]
                 if (content === "[DONE]") {
                     isChat.value = false // 聊天结束可以输入问题了
+                    // 保存本次对话记录
+                    saveConversation(myQuestion, s)
                     return
                 }
 
@@ -195,8 +297,200 @@ async function chat() {
     }
 }
 
-// 挂载函数
-// 加载页面后自动执行的代码
+
+
+// ==================== 新增：历史记录侧边栏数据 ====================
+// 当前登录用户名（后续可从 JWT 中解析后替换）
+// 若不这样写，username.value会为空，导致历史记录侧边栏数据为空字符串
+let username = ref(getUsername() || "")
+// 搜索关键字
+let searchKeyword = ref("")
+// 历史记录假数据（后续接入后端从数据库获取）
+let historyList = ref([])
+
+// 搜索父级对话记录
+let filteredHistory = computed(() => {
+    let keyword = searchKeyword.value.trim()
+    if (!keyword) return historyList.value
+    return historyList.value.filter(item => item.title.includes(keyword))
+})
+
+// 添加新对话
+function newChat() {
+    currentChatId.value = 0 // 将historyId 置0，表示新对话开始
+    messages.value = [] // 清空消息列表
+}
+
+// 搜索父级对话记录
+function searchParentHistory() {
+    let token = getToken()
+    // 从 localStorage 中获取userId
+    let userId = getUserId()
+    // 检查userId是否为空
+    if(!userId) {
+        ElMessage.error("请重新登录")
+        return
+    }
+    proxy.$axios({
+        url: "/history/searchParentHistory",
+        method: "get",
+        params: {
+            userId: userId,
+            question: searchKeyword.value
+        },
+        // 传递token参数
+        headers: {
+            "Authorization": "Bearer " + token
+        }
+    }).then(res => {
+        if (res.data.code === 200) {
+            historyList.value = res.data.data // 后端传过来的就是data_list
+        }
+    })
+    // 重新加载历史记录菜单栏
+    queryHistoryMenu()
+}
+
+// 清空搜索结果
+function clearHistoryList() {
+    searchKeyword.value = ""
+    // 清空搜索结果后，重新加载历史记录菜单栏
+    queryHistoryMenu()
+}
+
+
+
+
+
+// 删除指定历史记录
+function deleteConversation(historyId) {
+    // 从 localStorage 中获取 token
+    let token = getToken()
+    // 检查token是否为空
+    if(!token) {
+        ElMessage.error("请重新登录")
+        return
+    }
+    proxy.$axios({
+        url: "/history/deleteConversation",
+        method: "delete",
+        params: {
+            historyId: historyId
+        },
+        // 传递token参数
+        headers: {
+            "Authorization": "Bearer " + token
+        }
+    }).then(res => {
+        if (res.data.code === 200) {
+            ElMessage.success("删除成功")
+            // 删除成功后，刷新历史记录菜单栏
+            queryHistoryMenu()
+        } else {
+            ElMessage.error(res.data.msg)
+        }
+    })
+}
+
+// 获取历史记录菜单栏
+function queryHistoryMenu() {
+    // 判断用户是否在线，若未在线，则不查询历史记录菜单栏
+    if (!isOnline.value) {
+        ElMessage.error("请先登录")
+        return
+    }
+    // 从 localStorage 中获取 token
+    let token = getToken()
+    proxy.$axios({
+        url: "/history/queryHistoryMenu",
+        method: "get",
+        params: {
+            userId: getUserId()
+        },
+        // 传递token参数
+        headers: {
+            "Authorization": "Bearer " + token
+        }
+    }).then(res => {
+        if (res.data.code === 200) {
+            historyList.value = res.data.data // 后端传过来的就是data_list
+        }
+    })
+
+}
+
+
+
+
+// 保存历史对话记录
+// 后端使用了JWT权限需要传递token参数
+function saveConversation(question, answer) {
+    // 从 localStorage 中获取 token
+    let token = getToken()
+    if (!token) {
+        ElMessage.error("请重新登录")
+        return
+    }
+    proxy.$axios({
+        url: "/chat/saveConversation",
+        method: "post",
+        //使用post请求时使用data字段
+        // 需要存入数据库则需要question、user_id、answer、parent_id
+        // 注意：使用post请求时，这里需要将JSON对象转换为字符串
+        data: JSON.stringify({
+            question: question,
+            answer: answer,
+            userId: getUserId(),
+            parentId: currentChatId.value // parentId是当前对话的historyId，于是就做到了历史记录的关联
+        }),
+        // 传递token参数
+        headers: {
+            "Authorization": "Bearer " + token
+        }
+    }).then(res => {
+        // 只有当currentChatId.value为0时，才需要更新currentChatId.value，表示这是第一次对话
+        // 否则，后续的对话记录会基于当前的currentChatId.value进行关联
+        if (currentChatId.value === 0) {
+            currentChatId.value = res.data.data.history_id // history_id是在用户发送问题时生成的，用于后续的对话记录
+        }
+        // 加载历史记录菜单栏
+        queryHistoryMenu()
+    })
+}
+
+// 获取详细历史记录
+// 后端使用了JWT权限需要传递token参数
+function conversationLog(historyId) {
+    // 从 localStorage 中获取 token
+    let token = getToken()
+    if (!token) {
+        ElMessage.error("请重新登录")
+        return
+    }
+    currentChatId.value = historyId // 将当前对话的historyId设置为点击的历史记录的historyId
+    proxy.$axios({
+        url: "/history/conversationLog",
+        method: "get",
+        params: {
+            historyId: historyId
+        },
+        // 传递token参数
+        headers: {
+            "Authorization": "Bearer " + token
+        }
+    }).then(res => {
+        if (res.data.code === 200) {
+            console.log(res.data.msg)
+            messages.value = res.data.data // 将问题和答案全部显示在聊天区
+        } else {
+            ElMessage.error("查询失败")
+        }
+    })
+}
+
+
+
+
 // 组件卸载时中止未完成的请求，防止内存泄漏
 onUnmounted(() => {
     if (abortController) {
@@ -204,18 +498,530 @@ onUnmounted(() => {
     }
 })
 
+// 组件挂载时加载历史记录菜单栏
+onMounted(() => {
+    // 取出token中的username字段
+    if (username) {
+        // 将username的token解码为原始字符串
+        username.value = getUsername()
+        // 加载历史记录菜单栏
+        queryHistoryMenu()
+        if (!username.value) {
+            ElMessage.error("请重新登录")
+            return
+        }
+    }
+
+})
+
+
+
 </script>
 
 <style scoped>
-/* 滚动条美化 */
-div::-webkit-scrollbar {
+/* ==================== 主题变量 ==================== */
+/* 注意：scoped 样式下不能用 :root（会被重写成 :root[data-v-xxx] 永不匹配导致变量失效），
+   改为定义在组件根元素 .chat-shell 上 */
+.chat-shell {
+    --ink: #1b1e24;           /* 侧边栏深色背景 */
+    --ink-soft: #242830;      /* 侧边栏 hover */
+    --paper: #f6f4ef;         /* 聊天区暖纸色 */
+    --card: #ffffff;          /* 卡片白 */
+    --border: #e8e3d9;        /* 边框 */
+    --accent: #e8862e;        /* 琥珀强调色 */
+    --accent-soft: #fdf1e3;   /* 强调色浅底 */
+    --text: #26221b;          /* 主文字 */
+    --muted: #8a8275;         /* 次要文字 */
+
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    background: var(--paper);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+    color: var(--text);
+    overflow: hidden;
+}
+
+/* ==================== 侧边栏 ==================== */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--ink);
+    color: #e8e4dc;
+    padding: 20px 14px 16px;
+    gap: 16px;
+}
+
+/* 品牌标题 */
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 6px;
+}
+
+.brand-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), #f4b063);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(232, 134, 46, 0.35);
+}
+
+.brand-mark svg {
+    width: 24px;
+    height: 24px;
+}
+
+.sidebar-brand h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: #fff;
+    line-height: 1.3;
+}
+
+/* 新对话按钮 */
+.new-chat-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 11px 0;
+    border: 1px solid rgba(232, 134, 46, 0.5);
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.new-chat-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.new-chat-btn:hover {
+    background: #f0913e;
+    box-shadow: 0 4px 14px rgba(232, 134, 46, 0.35);
+    transform: translateY(-1px);
+}
+
+/* 搜索框 */
+.search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    width: 16px;
+    height: 16px;
+    color: #8a8275;
+    pointer-events: none;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 10px 34px 10px 36px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: var(--ink-soft);
+    color: #e8e4dc;
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.search-box input::placeholder {
+    color: #6f6a5f;
+}
+
+.search-box input:focus {
+    border-color: var(--accent);
+    background: #2a2e36;
+}
+
+.search-clear {
+    position: absolute;
+    right: 10px;
+    width: 18px;
+    height: 18px;
+    line-height: 16px;
+    text-align: center;
+    border-radius: 50%;
+    background: #4a4e55;
+    color: #cfc9bd;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.search-clear:hover {
+    background: #5c6169;
+}
+
+/* 历史记录列表 */
+.history-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.history-label {
+    margin: 4px 6px 8px;
+    font-size: 11px;
+    color: #6f6a5f;
+    letter-spacing: 1px;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 10px;
+    border-radius: 10px;
+    transition: background 0.15s ease;
+}
+
+.history-item:hover {
+    background: var(--ink-soft);
+}
+
+.history-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-title {
+    margin: 0;
+    font-size: 13px;
+    color: #ded9cf;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-time {
+    margin: 3px 0 0;
+    font-size: 11px;
+    color: #6f6a5f;
+}
+
+.history-delete {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: #6f6a5f;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.history-delete svg {
+    width: 16px;
+    height: 16px;
+}
+
+.history-item:hover .history-delete {
+    opacity: 1;
+}
+
+.history-delete:hover {
+    background: rgba(255, 99, 99, 0.2);
+    color: #ff8a8a;
+}
+
+/* 空状态 */
+.history-empty {
+    padding: 32px 0;
+    text-align: center;
+}
+
+.history-empty p {
+    margin: 0;
+    font-size: 12px;
+    color: #6f6a5f;
+}
+
+/* 底部用户信息 */
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.user-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6b8afd, #4f6df5);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.user-meta {
+    min-width: 0;
+}
+
+.user-name {
+    margin: 0;
+    font-size: 14px;
+    color: #fff;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-role {
+    margin: 2px 0 0;
+    font-size: 11px;
+    color: #7fb77f;
+}
+
+/* ==================== 聊天区 ==================== */
+.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background:
+        radial-gradient(circle at 15% 0%, rgba(232, 134, 46, 0.05), transparent 40%),
+        var(--paper);
+}
+
+/* 消息列表 */
+.message-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* 默认问候语 */
+.welcome {
+    margin: auto;
+    text-align: center;
+    color: var(--muted);
+}
+
+.welcome-mark {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 18px;
+    border-radius: 22px;
+    background: linear-gradient(135deg, var(--accent), #f4b063);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 30px rgba(232, 134, 46, 0.3);
+}
+
+.welcome-mark svg {
+    width: 38px;
+    height: 38px;
+}
+
+.welcome-text {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.welcome-sub {
+    margin: 0;
+    font-size: 14px;
+}
+
+/* 单条消息 */
+.message {
+    display: flex;
+    gap: 12px;
+    max-width: 78%;
+}
+
+.message.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+.message.assistant {
+    align-self: flex-start;
+}
+
+.avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.message.user .avatar {
+    background: linear-gradient(135deg, #6b8afd, #4f6df5);
+}
+
+.message.assistant .avatar {
+    background: linear-gradient(135deg, var(--accent), #f4b063);
+}
+
+.bubble {
+    padding: 12px 16px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.7;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.message.user .bubble {
+    background: linear-gradient(135deg, #6b8afd, #4f6df5);
+    color: #fff;
+    border-top-right-radius: 4px;
+}
+
+.message.assistant .bubble {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top-left-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* 底部输入栏 */
+.input-bar {
+    display: flex;
+    gap: 12px;
+    padding: 16px 28px 20px;
+    border-top: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(6px);
+}
+
+.input-wrap {
+    flex: 1;
+}
+
+.input-wrap input {
+    width: 100%;
+    padding: 13px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.input-wrap input::placeholder {
+    color: #b3ac9f;
+}
+
+.input-wrap input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(232, 134, 46, 0.12);
+}
+
+.input-wrap input:disabled {
+    background: #f0ede6;
+    cursor: not-allowed;
+}
+
+.send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 96px;
+    padding: 0 22px;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.send-btn:hover:not(:disabled) {
+    background: #f0913e;
+    box-shadow: 0 4px 14px rgba(232, 134, 46, 0.35);
+}
+
+.send-btn:disabled {
+    background: #d8d2c6;
+    cursor: not-allowed;
+}
+
+/* 生成中的小圆点动画 */
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* ==================== 滚动条美化 ==================== */
+.message-list::-webkit-scrollbar,
+.history-list::-webkit-scrollbar {
     width: 6px;
 }
-div::-webkit-scrollbar-thumb {
-    background: #ccc;
+
+.message-list::-webkit-scrollbar-thumb,
+.history-list::-webkit-scrollbar-thumb {
+    background: #ccc6ba;
     border-radius: 3px;
 }
-div::-webkit-scrollbar-thumb:hover {
-    background: #999;
+
+.message-list::-webkit-scrollbar-thumb:hover,
+.history-list::-webkit-scrollbar-thumb:hover {
+    background: #a8a194;
+}
+
+.history-list::-webkit-scrollbar-track {
+    background: transparent;
 }
 </style>

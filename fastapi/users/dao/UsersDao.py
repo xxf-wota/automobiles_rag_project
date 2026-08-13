@@ -55,7 +55,7 @@ def query_user_by_email(email: str):
         return None
 
 # 通过user_id查询用户信息
-def query_user_by_id(user_id: int):
+def query_user_by_id(userId: int):
     conn = MySQLUtil.get_mysql_conn()
     # 创建游标对象
     cursor = conn.cursor()
@@ -63,7 +63,7 @@ def query_user_by_id(user_id: int):
         # 编写sql语句
         sql = "SELECT * FROM users WHERE user_id = %s"
         # 执行sql语句
-        cursor.execute(sql, [user_id])
+        cursor.execute(sql, [userId])
         # 获取查询结果
         result = cursor.fetchall()
         # 关闭游标和连接
@@ -75,9 +75,16 @@ def query_user_by_id(user_id: int):
 
 
 
-
 if __name__ == '__main__':
     # insert_user(UsersEntity(username="test", password="123456", email="test@example.com"))
     results = query_user_by_email("1359525405@qq.com")
     print(results)
+
+
+
+
+
+
+
+
 

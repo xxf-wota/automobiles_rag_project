@@ -2,6 +2,9 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnablePassthrough
 from ai import LoadLLM, LoadChroma, LoadRerankerModel
+from chat.dao import ChatDao
+from chat.entity.ConversationEntity import ConversationEntity
+from chat.service import HistoryService
 from chat.utils import IntentionUtil
 
 
@@ -14,14 +17,15 @@ from users.dao import UsersDao
     或存在则记录user_id调用次数，若次数超过阈值则返回错误信息
     
 """
-def chat(question, user_id):
+def chat(question, userId, historyId):
+
 
     """
         验证用户user_id是否存在
         防止用户直接跳转到聊天服务没有通过登录验证
     """
     # 在这个函数中mysql已经进行了连接和关闭，所以不需要再连接
-    user_data = UsersDao.query_user_by_id(user_id)
+    user_data = UsersDao.query_user_by_id(userId)
     # 若用户user_id不存在，则返回错误信息
     if not user_data:
         return {
@@ -30,11 +34,20 @@ def chat(question, user_id):
             "data": None
         }
 
+    # 判断historyId是否为0，表示新对话的开始
+    if historyId == 0:
+        # 新对话的开始，将历史记录清空
+        history = []
+    else:
+        # 得到的是chat格式的历史记录
+        history = HistoryService.conversation_log(historyId)["data"]
+
     # 调用大模型对象
     llm = LoadLLM.load_llm()
     is_car_question = IntentionUtil.intention_recognition(question)["is_car_question"]
     # 若is_car_question为True，则调用RAG检索方法
     if not is_car_question:
+        history.append({'role': 'user','content': question})
         # 直接用大模型回答问题
         for chunk in llm.stream(question):
             # 过滤掉空内容
@@ -55,6 +68,8 @@ def chat(question, user_id):
             - 输出结果的时候，不允许输出根据提供的参考资料这样的内容
             - 输出结果的时候，如果没有参考的上下文信息，请给出一个友好的回复信息
             
+        历史记录：
+            {history}
         参考资料：
             {context}
         问题：
@@ -64,7 +79,7 @@ def chat(question, user_id):
     # 构建提示词对象
     prompt = PromptTemplate(
         template=template,
-        input_variables=["context", "question"]
+        input_variables=["history", "context", "question"]
     )
 
     # 加载向量数据库对象
@@ -72,7 +87,7 @@ def chat(question, user_id):
 
     # 获取向量检索器
     retriever = vector.as_retriever(search_kwargs={"k": 20})
-    # docs = retriever.search(question, filter={"user_id": user_id})
+
     # 打印召回的文档
     def print_recall(docs):
         print(f"召回文档：{len(docs)}个")
@@ -87,6 +102,7 @@ def chat(question, user_id):
         print("开始进行重排序：")
         print(data)
         # 将召回的文档核问题提取出来
+        history = data["history"]
         docs = data["context"]
         question = data["question"]
 
@@ -114,6 +130,7 @@ def chat(question, user_id):
         # 还需要将文档提取出来用于返回
         doc = [doc for doc in top_k_docs]
         return {
+            "history": history,
             "context": doc,
             "question": question,
         }
@@ -123,6 +140,7 @@ def chat(question, user_id):
     qa_chain = (
         RunnableParallel(
             {
+                "history": RunnableLambda(lambda _: history),
                 "context": retriever | RunnableLambda(print_recall),
                 "question": RunnablePassthrough(), # 保持用户问题不变
             }
@@ -139,11 +157,36 @@ def chat(question, user_id):
             yield chunk
 
 
+# 保存聊天记录
+def save_conversation(conversationEntity: ConversationEntity):
+    # 从conversationEntity中提取数据
+    question = conversationEntity.question
+    user_id = conversationEntity.userId
+    parentId = conversationEntity.parentId
+    answer = conversationEntity.answer
+    # 保存聊天记录
+    history_id = ChatDao.save_conversation(question, user_id, parentId, answer)
+    if history_id != 0:
+        return {
+            "code": 200,
+            "msg": "新增聊天记录成功",
+            "data": {
+                "history_id": history_id
+            }
+        }
+    else:
+        return {
+            "code": 400,
+            "msg": "新增聊天记录失败",
+            "data": None
+        }
+
+
+
+
+
 
 if __name__ == '__main__':
     question = "宝马1系 2018款官方指导价"
     user_id = 3
     print(list(chat(question, user_id)))
-
-
-

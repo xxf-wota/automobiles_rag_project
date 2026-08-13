@@ -4,6 +4,7 @@ from fastapi import FastAPI
 import uvicorn as uv
 
 from chat.controller.ChatController import chat_router
+from chat.controller.HistoryController import history_router
 from users.controller.UsersController import users_router
 
 # 生命周期配置
@@ -31,6 +32,14 @@ app.include_router(
     tags=["chat"] # swagger 路由标签
    )
 
+# 注册history路由
+app.include_router(
+    router=history_router, # 需要注册的路由
+    prefix="/history", # 路由前缀
+    tags=["history"] # swagger 路由标签
+   )
+
+
 
 # 跨域配置
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,7 +55,7 @@ app.add_middleware(
 # 启动服务
 if __name__ == '__main__':
     uv.run(
-        app="main:app",
+        app,
         host="localhost",
         port=8000,
         reload=False

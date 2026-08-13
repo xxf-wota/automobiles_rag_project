@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends
 import json
+
+from chat.entity.ConversationEntity import ConversationEntity
 from chat.service import ChatService
 from starlette.responses import StreamingResponse
 
@@ -24,8 +26,9 @@ chat_router = APIRouter()
 # 使用流式输出需要返回一个可迭代对象
 # 需要使用JWT，控制用户权限
 def chat(
-        question: str,
-        current_user: dict = Depends(get_current_user)
+    question: str,
+    historyId: int, # 历史记录id
+    current_user: dict = Depends(get_current_user),
 ):
     # 检查用户是否存在
     if current_user is None:
@@ -34,11 +37,11 @@ def chat(
             "msg": "用户不存在,请先登录",
             "data": None,
         }
-    user_id = current_user["user_id"]
+    userId = current_user["user_id"]
 
     def generate():
         print("进入生成器")
-        for chunk in ChatService.chat(question, user_id):
+        for chunk in ChatService.chat(question, userId, historyId):
             # 转换为json字符串
             # 生成SSE格式的字符串
             yield f"data: {json.dumps({'content': chunk})}\n\n"
@@ -49,7 +52,35 @@ def chat(
         media_type="text/event-stream",
     )
 
-
+# 保存聊天记录
+# 需要使用JWT，控制用户权限
+@chat_router.post(
+    path="/saveConversation",
+    summary="保存聊天记录",
+    description="""
+        保存聊天记录
+        访问路径：http://localhost:8000/chat/saveConversation
+        请求参数：
+            question：用户的问题
+            historyId：历史记录id
+        返回值：
+            保存结果
+    """
+)
+def save_conversation(
+    conversationEntity: ConversationEntity,
+    current_user: dict = Depends(get_current_user),
+):
+    # 检查用户是否存在
+    if current_user is None:
+        return {
+            "code": 400,
+            "msg": "用户不存在,请先登录",
+            "data": None,
+        }
+    # 保存聊天记录
+    userId = current_user["user_id"]
+    return ChatService.save_conversation(conversationEntity)
 
 
 
