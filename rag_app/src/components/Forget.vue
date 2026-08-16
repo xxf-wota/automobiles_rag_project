@@ -12,7 +12,7 @@
                     </svg>
                 </div>
                 <h1>汽车问答智能助手</h1>
-                <p class="brand-sub">验证码登录</p>
+                <p class="brand-sub">重置密码</p>
             </div>
 
             <!-- 表单 -->
@@ -20,6 +20,11 @@
                 <div class="field">
                     <label class="field-label">邮箱号</label>
                     <input type="text" placeholder="请输入邮箱号" v-model="email" />
+                </div>
+
+                <div class="field">
+                    <label class="field-label">新密码</label>
+                    <input type="password" placeholder="请输入新密码" v-model="password" />
                 </div>
 
                 <div class="field-row">
@@ -30,20 +35,14 @@
                     <button type="button" class="btn-send" @click="sendEmail">发送验证码</button>
                 </div>
 
-                <button type="button" class="btn-primary" @click="checkCode">登录</button>
-
-                <div class="link-row">
-                    <button type="button" class="link-btn" @click="pushLoginPassword">使用密码登录</button>
-                </div>
-
-                <div class="link-row">
-                    <button type="button" class="link-btn" @click="pushForget">忘记密码</button>
-                </div>
+                <button type="button" class="btn-primary" @click="forgetPassword">提交</button>
             </form>
 
             <!-- 底部链接 -->
             <div class="auth-footer">
-                <button type="button" class="link-btn" @click="pushRegister">还没有账号？注册账号</button>
+                <button type="button" class="link-btn" @click="pushLoginPassword">返回登录</button>
+                <span class="footer-divider">|</span>
+                <button type="button" class="link-btn" @click="pushRegister">注册账号</button>
             </div>
         </div>
     </div>
@@ -53,24 +52,23 @@
 import {ref, getCurrentInstance, onMounted} from "vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
-import {getStatus, setToken} from "../utils/auth.js";
 
-
+let router = useRouter()
 
 let email = ref("")
-
+let password = ref("")
 let code = ref("")
-let router = useRouter()
+
 let proxy = getCurrentInstance().proxy
 
+// 发送验证码
 function sendEmail() {
     ElMessage.info("发送验证码")
-    let sendEmail = email.value
     proxy.$axios({
         url: "/users/sendEmail",
         method: "get",
         params: {
-            email: sendEmail
+            email: email.value
         }
     }).then(res => {
         if (res.data.code === 200) {
@@ -81,51 +79,37 @@ function sendEmail() {
     })
 }
 
-function checkCode() {
-    let checkCode = code.value
-    let sendEmail = email.value
+
+// 忘记密码，点击提交按钮检查验证码是否正确并发送邮件以及更新密码
+function forgetPassword() {
     proxy.$axios({
-        url: "/users/checkCode",
+        url: "/users/forgetPassword",
         method: "get",
         params: {
-            email: sendEmail,
-            code: checkCode
+            email: email.value,
+            password: password.value,
+            code: code.value,
         }
     }).then(res => {
-        // 被封禁用户处理
-        if (getStatus() === 1) {
-            ElMessage.error("您已被封禁，无法登录")
-            return
-        }
         if (res.data.code === 200) {
-            // 登录成功后，将token存储到localStorage
-            setToken(res.data.data.access_token)
-            // 处理被封禁的情况
-            if (getStatus() === 1) {
-                ElMessage.error("您已被封禁，无法登录")
-                return
-            }
-            ElMessage.info("登录成功")
-            setTimeout(() => {
-                router.push("/chat")
-            }, 1000)
+            ElMessage.success("密码重置成功")
+            router.push("/loginPassword")
         } else {
             ElMessage.error(res.data.msg)
         }
     })
 }
 
+// 跳转密码登录界面
 function pushLoginPassword() {
     router.push("/loginPassword")
 }
-
+// 跳转注册界面
 function pushRegister() {
     router.push("/register")
 }
 
-function pushForget() {
-    router.push("/forget")
-}
+
 
 </script>
 
@@ -140,7 +124,6 @@ function pushForget() {
     --accent-soft: #fdf1e3;
     --text: #26221b;
     --muted: #8a8275;
-    --accent-blue: #4f6df5;
 
     display: flex;
     align-items: center;
@@ -312,9 +295,21 @@ function pushForget() {
     transform: translateY(0);
 }
 
-/* 链接行 */
-.link-row {
+/* ==================== 底部 ==================== */
+.auth-footer {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
     text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.footer-divider {
+    color: var(--border);
+    font-size: 13px;
 }
 
 .link-btn {
@@ -331,13 +326,5 @@ function pushForget() {
 .link-btn:hover {
     color: #d87a24;
     text-decoration: underline;
-}
-
-/* ==================== 底部 ==================== */
-.auth-footer {
-    margin-top: 28px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-    text-align: center;
 }
 </style>

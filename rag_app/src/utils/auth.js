@@ -71,5 +71,43 @@ export function getUserId() {
     }
 }
 
+// 获取JWT中的role字段
+export function getRole() {
+    const token = getToken()
+    if (!token) {
+        return null
+    }
+    try {
+        // [0] 解析 header 部分
+        // [1] 解析 payload 部分
+        // [2] 解析 signature 部分
+        const decoded = JSON.parse(atob(token.split(".")[1]))
+        // console.log(decoded.role)
+        return decoded.role
+    } catch (error) {
+        return null
+    }
+}
+
+// 获取JWT中的status字段
+export function getStatus() {
+    const token = getToken()
+    if (!token) {
+        return null
+    }
+    try {
+        // [0] 解析 header 部分
+        // [1] 解析 payload 部分
+        // [2] 解析 signature 部分
+        const decoded = JSON.parse(atob(token.split(".")[1]))
+        // console.log(decoded.status)
+        return decoded.status
+    } catch (error) {
+        return null
+    }
+}
+
+
+
 
 

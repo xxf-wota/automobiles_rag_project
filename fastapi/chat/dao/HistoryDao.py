@@ -48,7 +48,7 @@ def search_parent_history(userId, question):
     cursor = conn.cursor()
     # 通过parent_id查询父记录
     sql = "select history_id, question, create_time from history where user_id = %s and question like %s and parent_id = 0"
-    cursor.execute(sql, [userId, question])
+    cursor.execute(sql, [userId, f"%{question}%"])
     results = cursor.fetchall()
     MySQLUtil.close_mysql_conn(cursor, conn)
     return results
@@ -60,6 +60,6 @@ def search_parent_history(userId, question):
 if __name__ == '__main__':
     # print(conversation_log(1))
     # print(query_history_menu(3))
-    print(search_parent_history(3, "你好"))
+    print(search_parent_history(3, "车内"))
 
 

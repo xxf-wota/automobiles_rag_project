@@ -84,4 +84,5 @@ if __name__ == '__main__':
     # print(conversation_log(1))
     # print(query_history_menu(3))
     print(search_parent_history(3, "你好"))
+    print(len(search_parent_history(3, "你好")['data']))
 

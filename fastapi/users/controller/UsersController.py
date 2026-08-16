@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from users.entity.UsersEntity import UsersEntity
+from users.entity.UsersEntity import UsersEntity, UsersRoleEntity, UsersBanEntity
 from users.service import UsersService
+from utils.RolePermission import require_admin
 
 users_router = APIRouter()
 
@@ -93,9 +94,26 @@ def email_password(email: str, password: str):
     return UsersService.email_password(email, password)
 
 
-
-
-
+# 忘记密码接口
+@users_router.get(
+    path="/forgetPassword",
+    summary="忘记密码",
+    description="""
+        忘记密码，需要输入邮箱号，系统验证邮箱号是否存在，
+        若存在则返回重置密码的链接，若不存在则返回错误信息
+        访问路径：http://localhost:8000/users/forgetPassword
+        请求参数：
+            email：字符串类型，用户输入的邮箱号
+        返回值：
+            {
+                "code": 状态码，成功200、失败400，int
+                "msg": 提示信息，字符串
+                "data": None，数据内容，Object
+            }
+    """,
+)
+def forget_password(email: str, password: str, code: str):
+    return UsersService.forget_password(email, password, code)
 
 
 
@@ -125,5 +143,147 @@ def email_password(email: str, password: str):
 )
 def register(usersEntity: UsersEntity):
     return UsersService.register(usersEntity)
+
+
+# 获取用户权限信息的接口
+@users_router.get(
+    path="/getUserRoleList",
+    summary="获取用户权限信息",
+    description="""
+        获取用户权限信息，需要输入用户ID，系统验证用户ID是否存在，
+        若存在则返回用户权限信息，若不存在则返回错误信息
+        访问路径：http://localhost:8000/users/get
+        请求参数：
+            user_id：整数类型，用户ID
+        返回值：
+            {
+                "code": 状态码，成功200、失败400，int
+                "msg": 提示信息，字符串
+                "data": None，数据内容，Object
+            }
+    """,
+)
+def get_user_role_list(
+        current_user: dict = Depends(require_admin),
+):
+    # 是否是管理员用户
+    if current_user is None:
+        return {
+            "code": 400,
+            "msg": "用户不存在,请先登录",
+            "data": None,
+        }
+    return UsersService.get_user_role_list()
+
+
+
+
+
+
+"""
+    修改用户权限接口 admin or user
+"""
+@users_router.post(
+    path="/changeRole",
+    summary="修改用户权限",
+    description="""
+        修改用户权限，需要输入用户ID、角色，系统验证用户ID是否存在，
+        若存在则修改成功，若不存在则修改失败
+        访问路径：http://localhost:8000/users/changeRole
+        请求参数：
+            user_id：整数类型，用户ID
+            role：字符串类型，用户角色
+        返回值：
+            {
+                "code": 状态码，成功200、失败400，int
+                "msg": 提示信息，字符串
+                "data": None，数据内容，Object
+            }
+    """,
+)
+def change_role(
+        usersRoleEntity: UsersRoleEntity,
+        current_user: dict = Depends(require_admin),
+):
+    if current_user is None:
+        return {
+            "code": 400,
+            "msg": "用户不存在,请先登录",
+            "data": None,
+        }
+    return UsersService.change_role(usersRoleEntity)
+
+
+
+
+
+# 获取用户封禁状态接口
+@users_router.get(
+    path="/getUserBanStatus",
+    summary="获取用户封禁状态",
+    description="""
+        获取用户封禁状态，需要输入用户ID，系统验证用户ID是否存在，
+        若存在则返回用户封禁状态，若不存在则返回错误信息
+        访问路径：http://localhost:8000/users/getUserBanStatus
+        请求参数：
+            user_id：整数类型，用户ID
+        返回值：
+            {
+                "code": 状态码，成功200、失败400，int
+                "msg": 提示信息，字符串
+                "data": None，数据内容，Object
+            }
+    """,
+)
+def get_user_ban_status(
+        current_user: dict = Depends(require_admin),
+):
+    if current_user is None:
+        return {
+            "code": 400,
+            "msg": "用户不存在,请先登录",
+            "data": None,
+        }
+    return UsersService.get_user_ban_status()
+
+
+
+
+
+
+
+
+"""
+    对用户进行封禁接口
+"""
+@users_router.post(
+    path="/banUser",
+    summary="封禁用户",
+    description="""
+        封禁用户，需要输入用户ID，系统验证用户ID是否存在，
+        若存在则封禁成功，若不存在则封禁失败
+        访问路径：http://localhost:8000/users/banUser
+        请求参数：
+            user_id：整数类型，用户ID
+        返回值：
+            {
+                "code": 状态码，成功200、失败400，int
+                "msg": 提示信息，字符串
+                "data": None，数据内容，Object
+            }
+    """,
+)
+def ban_user(
+        usersBanEntity: UsersBanEntity,
+        current_user: dict = Depends(require_admin),
+):
+    if current_user is None:
+        return {
+            "code": 400,
+            "msg": "用户不存在,请先登录",
+            "data": None,
+        }
+    return UsersService.ban_user(usersBanEntity)
+
 
 

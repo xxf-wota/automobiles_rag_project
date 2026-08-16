@@ -1,6 +1,9 @@
 import { createApp } from 'vue'
 import './style.css'
 import App from './App.vue'
+// Markdown 配置
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 // 创建对象
 const app = createApp(App)
@@ -37,6 +40,32 @@ router.beforeEach((to, from, next) => {
         next()
     }
 })
+
+// markdown 配置全局
+marked.setOptions({
+  breaks: true,    // 支持换行
+  gfm: true,       // GitHub 风格
+  smartLists: true,
+  smartypants: false
+})
+
+// markdown 正则处理
+function normalizeMarkdown(text) {
+    return text
+        .replace(/(#{1,6} )/g, '\n$1')
+        .replace(/- /g, '\n- ')
+}
+
+// 全局 markdown 渲染方法
+function renderMarkdown(text) {
+    if (!text) return ''
+    const rawHtml = marked.parse(normalizeMarkdown(text))
+    return DOMPurify.sanitize(rawHtml)
+}
+app.config.globalProperties.$renderMarkdown = renderMarkdown
+
+
+
 
 
 app.mount('#app')

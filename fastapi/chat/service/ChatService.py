@@ -5,8 +5,7 @@ from ai import LoadLLM, LoadChroma, LoadRerankerModel
 from chat.dao import ChatDao
 from chat.entity.ConversationEntity import ConversationEntity
 from chat.service import HistoryService
-from chat.utils import IntentionUtil
-
+from chat.utils import IntentionUtil, BM25Util, RRFUtil
 
 from users.dao import UsersDao
 
@@ -89,15 +88,33 @@ def chat(question, userId, historyId):
     retriever = vector.as_retriever(search_kwargs={"k": 20})
 
     # 打印召回的文档
-    def print_recall(docs):
-        print(f"召回文档：{len(docs)}个")
+    def print_recall(title, docs):
+        print(f"{title}到的文档：")
+        print(docs)
         for doc in docs:
             print(doc.page_content)
             print('=' * 100)
         return docs # 返回召回的文档
 
+    # 混合检索
+    def retriever_func():
+        # 向量检索
+        vector_result = retriever.invoke(question)
+        print_recall("向量检索", vector_result)
+        # BM25检索
+        bm25, docs = BM25Util.build_bm25_index(vector)
+        bm25_results = BM25Util.bm25_retriever(bm25, question, docs, k=20)
+        print_recall("BM25检索", bm25_results)
 
-    # 重排序
+        # rrf融合
+        result = RRFUtil.rrf(vector_result, bm25_results)
+
+        return result
+
+
+
+
+       # 重排序
     def reranker_func(data):
         print("开始进行重排序：")
         print(data)
@@ -126,6 +143,7 @@ def chat(question, userId, historyId):
         print("重排序后的文档：")
         for index, doc in enumerate(top_k_docs):
             print(f"查询到的文档{index + 1}： {doc}")
+            print('=' * 100)
 
         # 还需要将文档提取出来用于返回
         doc = [doc for doc in top_k_docs]
@@ -141,7 +159,7 @@ def chat(question, userId, historyId):
         RunnableParallel(
             {
                 "history": RunnableLambda(lambda _: history),
-                "context": retriever | RunnableLambda(print_recall),
+                "context": RunnableLambda(lambda _: retriever_func()),
                 "question": RunnablePassthrough(), # 保持用户问题不变
             }
         )

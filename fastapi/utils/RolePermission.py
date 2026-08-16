@@ -37,7 +37,8 @@ def get_current_user(request: Request):
     return {
         "user_id": payload.get("user_id"),
         "email": payload.get("email"),
-        "username": payload.get("username")
+        "username": payload.get("username"),
+        "role": payload.get("role")
     }
 
 
@@ -61,3 +62,17 @@ def get_current_email(current_user: dict = Depends(get_current_user)):
     获取当前用户邮箱
     """
     return current_user.get("email")
+
+
+
+# 只允许admin角色访问
+def require_admin(current_user: dict = Depends(get_current_user)):
+    """
+    验证用户角色为admin
+    """
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="您没有权限访问此资源"
+        )
+    return current_user

@@ -24,13 +24,37 @@ const routes = [
     },
     component: () => import('../components/LoginPassword.vue')
   },
+    {
+    path: '/forget', // 忘记密码页
+    meta: {
+      isLogin: false // 忘记密码页不需要拦截
+    },
+    component: () => import('../components/Forget.vue')
+  },
+
   {
     path: '/chat', // 聊天页
     meta: {
       isLogin: true // 聊天页需要拦截
     },
     component: () => import('../components/Chat.vue')
+  },
+  {
+    path: '/admin', // 管理员页
+    meta: {
+      isLogin: true // 管理员页需要拦截
+    },
+    component: () => import('../components/Admin.vue')
+  },
+  {
+    path: '/adminBan', // 管理员禁用页
+    meta: {
+      isLogin: true // 管理员禁用页需要拦截
+    },
+    component: () => import('../components/AdminBan.vue')
   }
+
+
 
 ]
 

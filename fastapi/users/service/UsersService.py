@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from common import RedisUtil, MySQLUtil
 from users.dao import UsersDao
-from users.entity.UsersEntity import UsersEntity
+from users.entity.UsersEntity import UsersEntity, UsersRoleEntity, UsersBanEntity
 from utils.JWTUtil import create_access_token
 
 load_dotenv()
@@ -114,13 +114,22 @@ def check_code(email: str, code: str):
         # 当验证码正确时，给用户邮箱发送提醒邮件并返回成功信息
         # 从数据库中查询用户信息
         user_data = UsersDao.query_user_by_email(email)
+        # 从数据库中查询用户角色
+        users_role = UsersDao.query_users_role(user_data[0]["user_id"])
+        role = users_role[0]["role"]
+        # 从数据库中查询用户封禁状态
+        user_status = UsersDao.get_user_ban_status_by_user_id(user_data[0]["user_id"])
+        status = user_status[0]["status"]
+
         # 生成JWT Token
         user_id = user_data[0]["user_id"]
         username = user_data[0]["username"]
         token = create_access_token({
             "user_id": user_id,
             "email": email,
-            "username": username
+            "username": username,
+            "role": role,
+            "status": status
         })
 
         # 配置发送信息
@@ -173,7 +182,6 @@ def check_code(email: str, code: str):
 # 使用密码登录服务
 def email_password(email: str, password: str):
     # 要验证邮箱号和密码是否正确，需要从数据库中查询用户信息
-
     user_data = UsersDao.query_user_by_email(email)
     # 当查询结果为一个空元组时，说明邮箱号不存在
     if isinstance(user_data, tuple):
@@ -189,25 +197,30 @@ def email_password(email: str, password: str):
             "data": None
         }
     # 若邮箱号和密码都正确，返回成功信息
-
-
-
     try:
+    # 查询用户角色
+        users_role = UsersDao.query_users_role(user_data[0]["user_id"])
+        role = users_role[0]["role"]
+
         # 生成JWT Token
         user_id = user_data[0]["user_id"]
         username = user_data[0]["username"]
+        user_status = UsersDao.get_user_ban_status_by_user_id(user_id)
+        status = user_status[0]["status"]
         token = create_access_token({
             "user_id": user_id,
             "email": email,
-            "username": username
+            "username": username,
+            "role": role,
+            "status": status
         })
 
         # 发送提醒邮件到用户邮箱号
         # 配置发送信息
-        sender = os.getenv("SENDER_EMAIL") # 发送邮箱号
-        sender_pwd = os.getenv("SENDER_EMAIL_PASSWORD") # 授权码
-        subject = "登录成功" # 邮件主题
-        context = f"您已成功登录，欢迎来到我们的平台，若不是您操作，请及时冻结账号" # 邮件内容
+        sender = os.getenv("SENDER_EMAIL")  # 发送邮箱号
+        sender_pwd = os.getenv("SENDER_EMAIL_PASSWORD")  # 授权码
+        subject = "登录成功"  # 邮件主题
+        context = f"您已成功登录，欢迎来到我们的平台，若不是您操作，请及时冻结账号"  # 邮件内容
         message = MIMEText(context, "plain", "utf-8")
         # 添加邮箱内容
         message["From"] = sender
@@ -235,7 +248,8 @@ def email_password(email: str, password: str):
                 "token_type": "bearer",
                 "user_id": user_id,
                 "email": email,
-                "username": username
+                "username": username,
+                "role": role
             }
         }
     except Exception as e:
@@ -245,15 +259,86 @@ def email_password(email: str, password: str):
             "data": None
         }
 
+# 忘记密码服务
+def forget_password(email: str, password: str, code: str):
+    # 先判断邮箱号是否存在
+    isEmail = UsersDao.query_user_by_email(email)
+    if isinstance(isEmail, tuple):
+        return {
+            "code": 400,
+            "msg": "邮箱号不存在，请先注册",
+            "data": None
+        }
+    # 新密码和原密码不能相同
+    if password == isEmail[0]["password"]:
+        return {
+            "code": 400,
+            "msg": "新密码不能与原密码相同",
+            "data": None
+        }
+    try:
+        # 然后验证验证码是否正确
+        # 连接redis数据库
+        redis = RedisUtil.get_redis_conn()
+        redis_code = redis.get(email)
+        # 关闭redis连接
+        RedisUtil.close_redis_conn(redis)
+        # 验证验证码是否正确
+        if redis_code != code:
+            return {
+                "code": 400,
+                "msg": "验证码错误，请重新输入验证码",
+                "data": None
+            }
+
+        # 邮箱号存在了，发送重置密码邮件
+        result = UsersDao.change_password(email, password)
+        # 返回结果为 True or False
+        if result:
+            # 配置发送信息
+            sender = os.getenv("SENDER_EMAIL") # 发送邮箱号
+            sender_pwd = os.getenv("SENDER_EMAIL_PASSWORD") # 授权码
+            subject = "重置密码成功" # 邮件主题
+            context = f"您已成功重置密码，若不是您操作，请及时冻结账号" # 邮件内容
+            # 创建邮箱内容对象
+            message = MIMEText(context, "plain", "utf-8")
+            # 添加邮箱内容
+            message["From"] = sender
+            message["To"] = email
+            message["Subject"] = subject
+            # 构建发送邮箱对象
+            smtp = smtplib.SMTP(
+                host=os.getenv("SMTP_HOST"),
+                port=int(os.getenv("SMTP_PORT")),
+            )
+            # 开启邮箱发送服务 TLS
+            smtp.starttls()
+            # 验证发送方和授权码是否正确
+            smtp.login(sender, sender_pwd)
+            # 发送邮件
+            smtp.sendmail(sender, email, message.as_string())
+            # 关闭邮箱连接
+            smtp.quit()
+            # 返回成功信息
+            return {
+                "code": 200,
+                "msg": "重置密码成功，已发送提醒邮件到您的邮箱号",
+                "data": None
+            }
+        return {
+            "code": 400,
+            "msg": "重置密码失败",
+            "data": None
+        }
+    except Exception as e:
+        print(f"重置密码失败：{e}")
+        return {
+            "code": 400,
+            "msg": f"系统错误，重置密码请稍后重试",
+            "data": None
+        }
 
 
-
-
-# 注册服务
-"""
-    该服务用于用户输入邮箱号、密码、用户名点击发送验证码并输入后，
-    系统验证验证码是否正确，若正确则注册成功，并存入数据库
-"""
 def register(usersEntity: UsersEntity):
     try:
         # 验证验证码是否正确
@@ -271,16 +356,29 @@ def register(usersEntity: UsersEntity):
             }
         # 若验证码正确调用插入数据库方法
         result = UsersDao.insert_user(usersEntity)
-        if result == "插入用户成功":
+        # 插入用户状态表
+        user_id = UsersDao.query_user_by_email(usersEntity.email)[0]["user_id"]
+        ban_result = UsersDao.insert_users_status(user_id, usersEntity.username)
+
+        if result == "插入用户成功" and ban_result:
             # 查询新用户信息
             user_data = UsersDao.query_user_by_email(usersEntity.email)
             user_id = user_data[0]["user_id"]
-
+            # 插入users_role表
+            users_role = UsersDao.insert_users_role(user_id, usersEntity.username)
+            if not users_role:
+                return {
+                    "code": 400,
+                    "msg": "插入用户角色失败",
+                    "data": None
+                }
             # 生成JWT Token
             token = create_access_token({
                 "user_id": user_id,
                 "email": usersEntity.email,
-                "username": usersEntity.username
+                "username": usersEntity.username,
+                "role": "user",
+                "status": False  # 表示账号正常状态
             })
 
 
@@ -316,7 +414,9 @@ def register(usersEntity: UsersEntity):
                     "token_type": "bearer",
                     "user_id": user_id,
                     "email": usersEntity.email,
-                    "username": usersEntity.username
+                    "username": usersEntity.username,
+                    "role": "user",
+                    "status": False  # 表示账号正常状态
                 }
             }
 
@@ -334,6 +434,105 @@ def register(usersEntity: UsersEntity):
             "data": None
         }
 
+# 修改用户角色服务
+def change_role(usersRoleEntity: UsersRoleEntity):
+    # 从usersRoleEntity中提取数据
+    userId = usersRoleEntity.userId
+    role = usersRoleEntity.role
+    # 调用数据库方法修改用户角色
+    result = UsersDao.change_role(userId, role)
+    if result:
+        # 不需要更新JWT Token，因为角色没有改变，我们不是被修改的用户
+        return {
+            "code": 200,
+            "msg": "修改用户角色成功",
+            "data": None
+        }
+    else:
+        return {
+            "code": 400,
+            "msg": result,
+            "data": None
+        }
+
+# 获取用户角色服务
+def get_user_role_list():
+    # 调用数据库方法查询用户角色
+    result = UsersDao.get_user_role_list()
+    if result:
+        # 包装成前端需要的格式
+        data_list = []
+        for item in result:
+            data_list.append({
+                'user_id': item['user_id'],
+                'username': item['username'],
+                'role': item['role'],
+                'create_time': item['create_time'].strftime("%Y-%m-%d %H:%M:%S"),
+            })
+        return {
+            "code": 200,
+            "msg": "用户权限表查询成功",
+            "data": data_list
+        }
+    else:
+        return {
+            "code": 400,
+            "msg": "用户权限表查询失败",
+            "data": None
+        }
 
 
 
+# 获取用户封禁状态服务
+def get_user_ban_status():
+    # 调用数据库方法查询用户封禁状态
+    result = UsersDao.get_user_ban_status()
+    if result:
+        # 包装成前端需要的格式
+        data_list = []
+        for item in result:
+            data_list.append({
+                "user_id": item['user_id'],
+                "username": item['username'],
+                "status": item['status'],
+                # 若用户为被封禁则banned_time和normal_time都为创建时间
+                "banned_time": item['banned_time'].strftime("%Y-%m-%d %H:%M:%S"),
+                "normal_time": item['normal_time'].strftime("%Y-%m-%d %H:%M:%S"),
+            })
+        return {
+            "code": 200,
+            "msg": "用户封禁状态查询成功",
+            "data": data_list
+        }
+    else:
+        return {
+            "code": 400,
+            "msg": "用户封禁状态查询失败",
+            "data": None
+        }
+
+
+
+
+
+
+# 用户封禁服务
+def ban_user(usersBanEntity: UsersBanEntity):
+    # 从usersBanEntity中提取数据
+    userId = usersBanEntity.userId
+    status = usersBanEntity.status
+    # 调用数据库方法修改用户封禁状态
+    result = UsersDao.ban_user(userId, status, usersBanEntity.ban_time)
+
+    if result:
+        return {
+            "code": 200,
+            "msg": "修改用户封禁状态成功",
+            "data": None
+        }
+    else:
+        return {
+            "code": 400,
+            "msg": result,
+            "data": None
+        }

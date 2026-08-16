@@ -48,9 +48,9 @@
                     :key="item.id"
                     class="history-item"
                 >
-                    <div class="history-main">
-                        <p class="history-title" @click="conversationLog(item.id)">{{ item.title }}</p>
-                        <p class="history-time" @click="conversationLog(item.id)">{{ item.time }}</p>
+                    <div class="history-main" @click="conversationLog(item.id)">
+                        <p class="history-title" >{{ item.title }}</p>
+                        <p class="history-time" >{{ item.time }}</p>
                     </div>
                     <button
                         type="button"
@@ -72,10 +72,29 @@
 
             <!-- 底部用户信息 -->
             <div class="sidebar-user">
-                <div class="user-avatar">{{ username.charAt(0) }}</div>
+                <div class="user-avatar" @click="toggleUserMenu">{{ username.charAt(0) }}</div>
                 <div class="user-meta">
                     <p class="user-name">{{ username }}</p>
                     <p class="user-role">{{ isOnline ? '在线' : '离线' }}</p>
+                </div>
+                <!-- 退出登录按钮 -->
+                <button type="button" class="logout-btn" title="退出登录" @click="quitLogin">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <path d="M16 17l5-5-5-5" />
+                        <path d="M21 12H9" />
+                    </svg>
+                </button>
+
+                <!-- 用户弹出菜单 -->
+                <div v-if="showUserMenu" class="user-popup">
+                    <button type="button" class="popup-item" @click="goAdmin">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                            <path d="M8 21h8M12 17v4" />
+                        </svg>
+                        开发者平台
+                    </button>
                 </div>
             </div>
         </aside>
@@ -106,7 +125,7 @@
                     :class="msg.role"
                 >
                     <div class="avatar">{{ msg.role === 'user' ? '我' : 'AI' }}</div>
-                    <div class="bubble">{{ msg.content }}</div>
+                    <div class="bubble" v-html="msg.content"></div>
                 </div>
             </div>
 
@@ -139,8 +158,7 @@
 import {ref, computed, getCurrentInstance, onMounted, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
-import {getUsername, getToken, removeToken, getUserId} from "../utils/auth";
-
+import {getUsername, getToken, removeToken, getUserId, getRole, getStatus} from "../utils/auth"
 // ==================== 聊天业务 ====================
 // 定义聊天状态，false表示没有聊天，可以输入问题
 let isChat = ref(false)
@@ -282,7 +300,8 @@ async function chat() {
 
                 // 拼接并更新最后一条 assistant 消息的内容
                 s += content
-                messages.value[messages.value.length - 1].content = s
+                // 渲染 markdown 内容，这样可以支持换行、列表、代码块等 markdown 格式
+                messages.value[messages.value.length - 1].content = proxy.$renderMarkdown(s)
             }
         }
 
@@ -299,7 +318,7 @@ async function chat() {
 
 
 
-// ==================== 新增：历史记录侧边栏数据 ====================
+// ==================== 历史记录侧边栏数据 ====================
 // 当前登录用户名（后续可从 JWT 中解析后替换）
 // 若不这样写，username.value会为空，导致历史记录侧边栏数据为空字符串
 let username = ref(getUsername() || "")
@@ -344,6 +363,18 @@ function searchParentHistory() {
         }
     }).then(res => {
         if (res.data.code === 200) {
+            // console.log(res.data.data)
+            // 当搜索到的内容只有一个时，直接跳转到该对话记录
+            if (res.data.data.length === 1) {
+                messages.value = [] // 清空消息列表，因为用户可能点击了其他历史记录再搜索
+                historyList.value = res.data.data
+                // queryHistoryMenu()
+                conversationLog(res.data.data[0].id) // 需要取后端传过来的historyId，而不是currentChatId.value
+            }
+            if (searchKeyword.value === "") {
+                queryHistoryMenu()
+            }
+
             historyList.value = res.data.data // 后端传过来的就是data_list
         }
     })
@@ -384,6 +415,9 @@ function deleteConversation(historyId) {
     }).then(res => {
         if (res.data.code === 200) {
             ElMessage.success("删除成功")
+            // 删除成功后，清空消息列表
+            messages.value = []
+            currentChatId.value = 0 // 将historyId 置0，表示新对话开始
             // 删除成功后，刷新历史记录菜单栏
             queryHistoryMenu()
         } else {
@@ -415,6 +449,7 @@ function queryHistoryMenu() {
         if (res.data.code === 200) {
             historyList.value = res.data.data // 后端传过来的就是data_list
         }
+
     })
 
 }
@@ -482,21 +517,60 @@ function conversationLog(historyId) {
         if (res.data.code === 200) {
             console.log(res.data.msg)
             messages.value = res.data.data // 将问题和答案全部显示在聊天区
+        if (searchKeyword.value === "") {
+            queryHistoryMenu()
+        }
         } else {
             ElMessage.error("查询失败")
         }
     })
 }
 
+// 退出登录
+function quitLogin() {
+    // 清除token
+    removeToken()
+    // 跳转到登录页
+    router.push("/")
+}
+// ==================== 用户弹出菜单 ====================
+let showUserMenu = ref(false)
 
+function toggleUserMenu() {
+    showUserMenu.value = !showUserMenu.value
+}
 
-
-// 组件卸载时中止未完成的请求，防止内存泄漏
-onUnmounted(() => {
-    if (abortController) {
-        abortController.abort()
+function goAdmin() {
+    if (!isAdmin()) {
+        return
     }
-})
+    ElMessage.info("正在跳转到管理员页面")
+    setTimeout(() => {
+        router.push("/Admin")
+    }, 1000)
+    showUserMenu.value = false
+
+}
+
+// 点击外部关闭弹出菜单
+function handleClickOutside(e) {
+    let sidebar = document.querySelector(".sidebar-user")
+    if (sidebar && !sidebar.contains(e.target)) {
+        showUserMenu.value = false
+    }
+}
+
+// ==================== 管理员权限 ====================
+// 检查用户是否为管理员
+function isAdmin() {
+    if (getRole() === "admin") {
+        return true
+    }
+    ElMessage.error("您不是管理员，无法跳转到管理员页面")
+    return false
+}
+
+
 
 // 组件挂载时加载历史记录菜单栏
 onMounted(() => {
@@ -507,12 +581,23 @@ onMounted(() => {
         // 加载历史记录菜单栏
         queryHistoryMenu()
         if (!username.value) {
-            ElMessage.error("请重新登录")
+            ElMessage.error("请先登录")
             return
         }
     }
-
+    document.addEventListener("click", handleClickOutside)
 })
+
+
+// 组件卸载时中止未完成的请求，防止内存泄漏
+onUnmounted(() => {
+    if (abortController) {
+        abortController.abort()
+    }
+    document.removeEventListener("click", handleClickOutside)
+})
+
+
 
 
 
@@ -769,6 +854,7 @@ onMounted(() => {
     gap: 10px;
     padding: 12px 10px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
 }
 
 .user-avatar {
@@ -783,10 +869,17 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.user-avatar:hover {
+    box-shadow: 0 0 0 3px rgba(107, 138, 253, 0.35);
 }
 
 .user-meta {
     min-width: 0;
+    flex: 1;
 }
 
 .user-name {
@@ -803,6 +896,86 @@ onMounted(() => {
     margin: 2px 0 0;
     font-size: 11px;
     color: #7fb77f;
+}
+
+/* 退出登录按钮 */
+.logout-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #8a8275;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.logout-btn svg {
+    width: 17px;
+    height: 17px;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 99, 99, 0.18);
+    color: #ff8a8a;
+}
+
+/* 用户弹出菜单 */
+.user-popup {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: #2a2e36;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    z-index: 100;
+    animation: popupIn 0.15s ease;
+}
+
+@keyframes popupIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.popup-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #e8e4dc;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    text-align: left;
+}
+
+.popup-item svg {
+    width: 17px;
+    height: 17px;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.popup-item:hover {
+    background: var(--ink-soft);
+    color: #fff;
 }
 
 /* ==================== 聊天区 ==================== */

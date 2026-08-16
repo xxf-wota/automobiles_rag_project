@@ -80,6 +80,7 @@ def save_conversation(
         }
     # 保存聊天记录
     userId = current_user["user_id"]
+    conversationEntity.userId = userId
     return ChatService.save_conversation(conversationEntity)
 
 
