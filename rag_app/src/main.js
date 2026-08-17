@@ -22,11 +22,28 @@ app.use(ElementPlus)
 
 // axios 全局配置
 import axios from 'axios'
-import {getUsername} from "./utils/auth.js"; // 导入axios包
+import {getUsername, removeToken} from "./utils/auth.js"; // 导入axios包
+import {ElMessage} from "element-plus";
 axios.defaults.baseURL = 'http://localhost:8000/' // 服务器请求路径公共部分
 axios.defaults.headers.post['Content-Type'] = 'application/json' // post请求发送json数据给服务器
 axios.defaults.headers.put['Content-Type'] = 'application/json' // put请求发送json数据给服务器
 app.config.globalProperties.$axios = axios // 挂载axios，使用 对象.$axios 代替原生的axios
+
+// axios 响应拦截器：全局统一处理 token 失效
+// 但内部主动处理token失效也不影响
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        if (error.response && error.response.status === 401) {
+            removeToken()
+            ElMessage.error("登录已过期，请重新登录")
+            setTimeout(() => {
+                router.push("/")
+            }, 1000)
+        }
+        return Promise.reject(error)
+    }
+)
 
 // 导航守卫
 router.beforeEach((to, from, next) => {
@@ -69,7 +86,3 @@ app.config.globalProperties.$renderMarkdown = renderMarkdown
 
 
 app.mount('#app')
-
-
-
-

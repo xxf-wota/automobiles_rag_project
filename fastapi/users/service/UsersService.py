@@ -168,7 +168,9 @@ def check_code(email: str, code: str):
                 "token_type": "bearer",
                 "user_id": user_id,
                 "email": email,
-                "username": username
+                "username": username,
+                "role": role,
+                "status": status
             }
         }
 
@@ -215,6 +217,8 @@ def email_password(email: str, password: str):
             "role": role,
             "status": status
         })
+        # 将token存储到redis中
+        RedisUtil.set_token(user_id, token)
 
         # 发送提醒邮件到用户邮箱号
         # 配置发送信息
@@ -250,7 +254,8 @@ def email_password(email: str, password: str):
                 "user_id": user_id,
                 "email": email,
                 "username": username,
-                "role": role
+                "role": role,
+                "status": status
             }
         }
     except Exception as e:
@@ -339,7 +344,7 @@ def forget_password(email: str, password: str, code: str):
             "data": None
         }
 
-
+# 注册服务
 def register(usersEntity: UsersEntity):
     try:
         # 验证验证码是否正确

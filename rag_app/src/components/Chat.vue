@@ -228,6 +228,7 @@ async function chat() {
         })
 
         // 2. token 无效或过期，后端返回 401
+        // response.status 是固定的，不是后端返回的 code 字段
         if (response.status === 401) {
             removeToken() // 删除过期的 token
             ElMessage.error("登录已过期，请重新登录")
@@ -580,10 +581,6 @@ onMounted(() => {
         username.value = getUsername()
         // 加载历史记录菜单栏
         queryHistoryMenu()
-        if (!username.value) {
-            ElMessage.error("请先登录")
-            return
-        }
     }
     document.addEventListener("click", handleClickOutside)
 })

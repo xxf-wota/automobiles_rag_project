@@ -6,6 +6,7 @@ from chat.dao import ChatDao
 from chat.entity.ConversationEntity import ConversationEntity
 from chat.service import HistoryService
 from chat.utils import IntentionUtil, BM25Util, RRFUtil
+from common import RedisUtil
 
 from users.dao import UsersDao
 
@@ -40,15 +41,20 @@ def chat(question, userId, historyId):
     else:
         # 得到的是chat格式的历史记录
         history = HistoryService.conversation_log(historyId)["data"]
+    # print(history)
+    # print(historyId)
 
     # 调用大模型对象
     llm = LoadLLM.load_llm()
     is_car_question = IntentionUtil.intention_recognition(question)["is_car_question"]
+    print(is_car_question)
     # 若is_car_question为True，则调用RAG检索方法
     if not is_car_question:
         history.append({'role': 'user','content': question})
         # 直接用大模型回答问题
-        for chunk in llm.stream(question):
+        # 将历史记录传入大模型，作为上下文信息
+        # 使其能够根据历史记录回答用户问题
+        for chunk in llm.stream(history):
             # 过滤掉空内容
             if chunk.content:
                 print(chunk.content)
@@ -207,4 +213,4 @@ def save_conversation(conversationEntity: ConversationEntity):
 if __name__ == '__main__':
     question = "宝马1系 2018款官方指导价"
     user_id = 3
-    print(list(chat(question, user_id)))
+    # print(list(chat(question, user_id)))

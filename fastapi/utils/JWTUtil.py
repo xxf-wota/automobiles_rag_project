@@ -18,8 +18,8 @@ def create_access_token(data: Dict[str, str]) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({
-        "exp": expire,
-        "iat": datetime.now(timezone.utc),
+        "exp": expire, # 过期时间，防止token被永久使用
+        "iat": datetime.now(timezone.utc), # 签发时间，可用于判断token新旧
     })
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
