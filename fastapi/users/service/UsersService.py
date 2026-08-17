@@ -1,6 +1,7 @@
 import os
 import random
 import smtplib
+from datetime import datetime
 
 from email.mime.text import MIMEText
 
@@ -534,5 +535,41 @@ def ban_user(usersBanEntity: UsersBanEntity):
         return {
             "code": 400,
             "msg": result,
+            "data": None
+        }
+
+
+# 自动解封用户服务
+def auto_change_status(userId: int):
+    ban_status = UsersDao.get_user_ban_status_by_user_id(userId)[0]
+    try:
+        # 如果当前时间大于等于用户封禁状态中的封禁时间，则自动解封用户
+        if datetime.now() >= ban_status["normal_time"] and ban_status["status"]:
+            result = UsersDao.auto_change_status(userId, False)
+            if result:
+                return {
+                    "code": 200,
+                    "msg": "自动修改用户封禁状态成功",
+                    "data": None
+                }
+
+            else:
+                return {
+                    "code": 400,
+                    "msg": result,
+                    "data": None
+                }
+
+        # 用户未到解封时间（或已无需解封），直接返回成功，避免返回 null 导致前端报错
+        return {
+            "code": 200,
+            "msg": "用户未到解封时间，无需解封",
+            "data": None
+        }
+    except Exception as e:
+        print(f"自动解封用户失败：{e}")
+        return {
+            "code": 400,
+            "msg": "自动解封用户失败",
             "data": None
         }

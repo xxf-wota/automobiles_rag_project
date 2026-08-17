@@ -171,7 +171,7 @@
 </template>
 
 <script setup>
-import {ref, getCurrentInstance, onMounted} from "vue";
+import {ref, getCurrentInstance, onMounted, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
 import {getToken, getUserId, getUsername, removeToken, getRole, getStatus} from "../utils/auth.js";
 
@@ -231,13 +231,13 @@ function getUserBanStatus() {
     if (!token) {
         ElMessage.error("请重新登录")
         router.push("/Login")
-        return
+        return Promise.reject()
     }
     if (!isAdmin()) {
         ElMessage.error("您没有管理员权限")
-        return
+        return Promise.reject()
     }
-    proxy.$axios({
+    return proxy.$axios({
         url: "/users/getUserBanStatus",
         method: "get",
         headers: {
@@ -293,6 +293,40 @@ function banUser(userId, status, ban_time) {
 
 }
 
+// 自动解封用户服务（后端自行查询所有过期用户并解封，无需传userId）
+function autoChangeStatus(userId) {
+    let token = getToken()
+    if (!token) {
+        ElMessage.error("请重新登录")
+        router.push("/Login")
+        return Promise.reject()
+    }
+    if (!isAdmin()) {
+        ElMessage.error("您没有管理员权限")
+        return Promise.reject()
+    }
+    // 自动解封用户：仅当 userID 有效时才传参
+    let config = {
+        url: "/users/autoChangeStatus",
+        method: "get",
+        headers: {
+            "Authorization": "Bearer " + token
+        },
+    }
+    if (userId) {
+        config.params = { userId: userId }
+    }
+    return proxy.$axios(config).then(res => {
+        if (res.data.code === 200) {
+            return res
+        } else {
+            ElMessage.error(res.data.msg)
+        }
+    })
+
+}
+
+
 // 回到聊天页面
 function pushChat() {
     router.push("/chat")
@@ -309,8 +343,39 @@ function quitLogin() {
     router.push("/")
 }
 
-onMounted(() => {
-    getUserBanStatus()
+let autoCheckTimer = null
+
+function not_ban_user() {
+    let tasks = []
+    for (let user of userBanList.value) {
+        if (user.status === 1) {
+            tasks.push(autoChangeStatus(user.user_id))
+        }
+    }
+    if (tasks.length > 0) {
+        // 使用 allSettled：即使某个请求失败也不会 reject，保证列表一定能刷新
+        Promise.allSettled(tasks).then(() => {
+            getUserBanStatus()
+        })
+    }
+}
+// 组件挂载
+onMounted(async () => {
+    await getUserBanStatus()
+    // 自动解封所有封禁时间到的用户
+    not_ban_user()
+    // 每 30 秒自动检查一次封禁状态
+    autoCheckTimer = setInterval(() => {
+        not_ban_user()
+    }, 30000) // 30000ms
+
+})
+
+onUnmounted(() => {
+    if (autoCheckTimer) {
+        clearInterval(autoCheckTimer)
+        autoCheckTimer = null
+    }
 })
 
 </script>

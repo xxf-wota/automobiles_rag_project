@@ -245,6 +245,30 @@ def get_user_ban_status_by_user_id(user_id: int):
         print(f"查询用户封禁状态失败：{e}")
         return None
 
+# 当封禁时间到后，自动改变用户状态
+def auto_change_status(userId, status):
+    conn = MySQLUtil.get_mysql_conn()
+    cursor = conn.cursor()
+    try:
+        sql = "UPDATE users_status SET status = %s, banned_time = now(), normal_time = now() WHERE user_id = %s"
+        cursor.execute(sql, [status, userId])
+        # 提交事务
+        conn.commit()
+        print("自动修改用户封禁状态成功")
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"自动修改用户封禁状态失败：{e}")
+        return False
+    finally:
+        MySQLUtil.close_mysql_conn(cursor, conn)
+
+
+
+
+
+
+
 
 
 

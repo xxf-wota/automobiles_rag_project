@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from typing import Optional
 
 from users.entity.UsersEntity import UsersEntity, UsersRoleEntity, UsersBanEntity
 from users.service import UsersService
@@ -284,6 +285,37 @@ def ban_user(
             "data": None,
         }
     return UsersService.ban_user(usersBanEntity)
+
+
+# 自动解封用户接口
+@users_router.get(
+    path="/autoChangeStatus",
+    summary="自动解封用户",
+    description="""
+        自动解封用户，需要输入用户ID，系统验证用户ID是否存在，
+        若存在则自动解封成功，若不存在则自动解封失败
+        访问路径：http://localhost:8000/users/autoChangeStatus
+        请求参数：
+            user_id：整数类型，用户ID
+        返回值：
+            {
+                "code": 状态码，成功200、失败400，int
+                "msg": 提示信息，字符串
+                "data": None，数据内容，Object
+            }
+    """,
+)
+def auto_change_status(
+        userId: Optional[int] = Query(None),
+        current_user: dict = Depends(require_admin),
+):
+    if current_user is None:
+        return {
+            "code": 400,
+            "msg": "用户不存在,请先登录",
+            "data": None,
+        }
+    return UsersService.auto_change_status(userId)
 
 
 

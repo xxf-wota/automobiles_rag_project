@@ -132,7 +132,7 @@
 <script setup>
 import {ref, getCurrentInstance, onMounted} from "vue";
 import {useRouter} from "vue-router";
-import {getToken, getUserId, getUsername, removeToken, getRole} from "../utils/auth.js";
+import {getToken, getUserId, getUsername, removeToken, getRole, getStatus} from "../utils/auth.js";
 
 import {ElMessage} from "element-plus";
 
@@ -189,7 +189,7 @@ function changeRole(userId, currentRole) {
         ElMessage.error("请重新登录")
         return
     }
-    if (getStatus() === "banned") {
+    if (getStatus() === 1) {
         ElMessage.error("您已被封禁，无法修改用户权限")
         return
     }
