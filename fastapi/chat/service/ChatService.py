@@ -7,7 +7,7 @@ from chat.entity.ConversationEntity import ConversationEntity
 from chat.service import HistoryService
 from chat.utils import IntentionUtil, BM25Util, RRFUtil
 from common import RedisUtil
-
+import re
 from users.dao import UsersDao
 
 # 聊天服务
@@ -17,8 +17,15 @@ from users.dao import UsersDao
     或存在则记录user_id调用次数，若次数超过阈值则返回错误信息
     
 """
-def chat(question, userId, historyId):
-
+def chat(question, userId, historyId, llm=None, vector=None, bm25=None, docs=None, reranker=None):
+    """
+        参数说明：
+            llm      - 从 app.state.llm 传入的预加载大模型
+            vector   - 从 app.state.vector 传入的预加载向量数据库
+            bm25     - 从 app.state.bm25 传入的预加载 BM25 索引
+            docs     - 从 app.state.docs 传入的文档列表
+            reranker - 从 app.state.reranker 传入的预加载重排序模型
+    """
 
     """
         验证用户user_id是否存在
@@ -45,7 +52,7 @@ def chat(question, userId, historyId):
     # print(historyId)
 
     # 调用大模型对象
-    llm = LoadLLM.load_llm()
+    # llm = LoadLLM.load_llm()
     is_car_question = IntentionUtil.intention_recognition(question)["is_car_question"]
     print(is_car_question)
     # 若is_car_question为True，则调用RAG检索方法
@@ -57,8 +64,8 @@ def chat(question, userId, historyId):
         for chunk in llm.stream(history):
             # 过滤掉空内容
             if chunk.content:
-                print(chunk.content)
-                yield chunk.content
+                    print(chunk.content)
+                    yield chunk.content
         return
 
     # 意图识别为True，所以需要调用RAG检索方法
@@ -86,9 +93,8 @@ def chat(question, userId, historyId):
         template=template,
         input_variables=["history", "context", "question"]
     )
-
-    # 加载向量数据库对象
-    vector = LoadChroma.load_Chroma_conn()
+    # 调用向量数据库对象
+    # vector = LoadChroma.load_Chroma_conn()
 
     # 获取向量检索器
     retriever = vector.as_retriever(search_kwargs={"k": 20})
@@ -108,7 +114,7 @@ def chat(question, userId, historyId):
         vector_result = retriever.invoke(question)
         print_recall("向量检索", vector_result)
         # BM25检索
-        bm25, docs = BM25Util.build_bm25_index(vector)
+        # bm25, docs = BM25Util.build_bm25_index(vector_result)
         bm25_results = BM25Util.bm25_retriever(bm25, question, docs, k=20)
         print_recall("BM25检索", bm25_results)
 
@@ -133,8 +139,9 @@ def chat(question, userId, historyId):
         doc_list = [doc.page_content for doc in docs]
         print(doc_list)
 
-        # 加载重排序模型
-        reranker = LoadRerankerModel.load_reranker_model()
+        # 调用重排序模型对象
+        # reranker = LoadRerankerModel.load_reranker_model()
+
         # 设置重排序后的文档数据为15个
         top_k = 15
         # 将问题和文档用元组打包，为了调用重排序的计算方法
@@ -177,8 +184,8 @@ def chat(question, userId, historyId):
     for chunk in qa_chain.stream(question):
         # 过滤掉空内容
         if chunk:
-            print(chunk)
-            yield chunk
+                print(chunk)
+                yield chunk
 
 
 # 保存聊天记录

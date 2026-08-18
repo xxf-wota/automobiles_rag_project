@@ -3,13 +3,24 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn as uv
 
+from ai import LoadChroma, LoadRerankerModel, LoadLLM
 from chat.controller.ChatController import chat_router
 from chat.controller.HistoryController import history_router
+from chat.utils import BM25Util
 from users.controller.UsersController import users_router
 
 # 生命周期配置
 @asynccontextmanager
 async def start_end_run(app):
+    # 在应用启动时执行模型加载，避免在每次请求时都加载模型，提高响应速度
+    # 加载大模型对象
+    app.state.llm = LoadLLM.load_llm()
+    # 加载向量数据库对象
+    app.state.vector = LoadChroma.load_Chroma_conn()
+    # 加载BM25索引和文档
+    app.state.bm25, app.state.docs = BM25Util.build_bm25_index(app.state.vector)
+    # 加载重排序模型
+    app.state.reranker = LoadRerankerModel.load_reranker_model()
     # 应用启动时执行
     print("项目启动")
     yield

@@ -517,7 +517,12 @@ function conversationLog(historyId) {
     }).then(res => {
         if (res.data.code === 200) {
             console.log(res.data.msg)
-            messages.value = res.data.data // 将问题和答案全部显示在聊天区
+            const rawData = res.data.data
+            // 处理markdown格式，由于后端返回的是markdown格式，需要渲染为html格式
+            messages.value = rawData.map(msg => ({
+                role: msg.role,
+                content: msg.role === 'assistant' ? proxy.$renderMarkdown(msg.content) : msg.content
+            }))
         if (searchKeyword.value === "") {
             queryHistoryMenu()
         }
