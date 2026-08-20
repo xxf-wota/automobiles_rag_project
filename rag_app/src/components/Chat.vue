@@ -158,7 +158,7 @@
 import {ref, computed, getCurrentInstance, onMounted, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
-import {getUsername, getToken, removeToken, getUserId, getRole, getStatus} from "../utils/auth"
+import {getUsername, getSession, removeSession, getUserId, getRole, getStatus} from "../utils/auth.js"
 // ==================== 聊天业务 ====================
 // 定义聊天状态，false表示没有聊天，可以输入问题
 let isChat = ref(false)
@@ -168,7 +168,7 @@ let question = ref("")
 let messages = ref([])
 // 定义用户是否在线
 let isOnline = ref(false)
-if (getToken()) {
+if (getSession()) {
     isOnline.value = true
 }
 
@@ -222,7 +222,7 @@ async function chat() {
         // 1. 使用 fetch 发起请求，请求头携带 JWT 令牌
         let response = await fetch(url, {
             headers: {
-                "Authorization": "Bearer " + getToken()
+                "Authorization": "Bearer " + getSession()
             },
             signal: abortController.signal // 用于中止流式请求
         })
@@ -230,7 +230,7 @@ async function chat() {
         // 2. token 无效或过期，后端返回 401
         // response.status 是固定的，不是后端返回的 code 字段
         if (response.status === 401) {
-            removeToken() // 删除过期的 token
+            removeSession() // 删除过期的 session_id
             ElMessage.error("登录已过期，请重新登录")
             setTimeout(() => {
                 router.push("/")
@@ -238,6 +238,7 @@ async function chat() {
             isChat.value = false
             return
         }
+
 
         // 3. 其它错误状态码
         if (!response.ok) {
@@ -343,8 +344,8 @@ function newChat() {
 
 // 搜索父级对话记录
 function searchParentHistory() {
-    let token = getToken()
-    // 从 localStorage 中获取userId
+    let session_id = getSession()
+    // 从 sessionStorage 中获取userId
     let userId = getUserId()
     // 检查userId是否为空
     if(!userId) {
@@ -360,7 +361,7 @@ function searchParentHistory() {
         },
         // 传递token参数
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         }
     }).then(res => {
         if (res.data.code === 200) {
@@ -396,10 +397,10 @@ function clearHistoryList() {
 
 // 删除指定历史记录
 function deleteConversation(historyId) {
-    // 从 localStorage 中获取 token
-    let token = getToken()
-    // 检查token是否为空
-    if(!token) {
+    // 从 sessionStorage 中获取 session_id
+    let session_id = getSession()
+    // 检查session_id是否为空
+    if(!session_id) {
         ElMessage.error("请重新登录")
         return
     }
@@ -411,7 +412,7 @@ function deleteConversation(historyId) {
         },
         // 传递token参数
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         }
     }).then(res => {
         if (res.data.code === 200) {
@@ -434,8 +435,8 @@ function queryHistoryMenu() {
         ElMessage.error("请先登录")
         return
     }
-    // 从 localStorage 中获取 token
-    let token = getToken()
+    // 从 sessionStorage 中获取 session_id
+    let session_id = getSession()
     proxy.$axios({
         url: "/history/queryHistoryMenu",
         method: "get",
@@ -444,7 +445,7 @@ function queryHistoryMenu() {
         },
         // 传递token参数
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         }
     }).then(res => {
         if (res.data.code === 200) {
@@ -461,9 +462,9 @@ function queryHistoryMenu() {
 // 保存历史对话记录
 // 后端使用了JWT权限需要传递token参数
 function saveConversation(question, answer) {
-    // 从 localStorage 中获取 token
-    let token = getToken()
-    if (!token) {
+    // 从 sessionStorage 中获取 session_id
+    let session_id = getSession()
+    if (!session_id) {
         ElMessage.error("请重新登录")
         return
     }
@@ -481,7 +482,7 @@ function saveConversation(question, answer) {
         }),
         // 传递token参数
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         }
     }).then(res => {
         // 只有当currentChatId.value为0时，才需要更新currentChatId.value，表示这是第一次对话
@@ -497,9 +498,9 @@ function saveConversation(question, answer) {
 // 获取详细历史记录
 // 后端使用了JWT权限需要传递token参数
 function conversationLog(historyId) {
-    // 从 localStorage 中获取 token
-    let token = getToken()
-    if (!token) {
+    // 从 sessionStorage 中获取 session_id
+    let session_id = getSession()
+    if (!session_id) {
         ElMessage.error("请重新登录")
         return
     }
@@ -512,7 +513,7 @@ function conversationLog(historyId) {
         },
         // 传递token参数
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         }
     }).then(res => {
         if (res.data.code === 200) {
@@ -534,8 +535,19 @@ function conversationLog(historyId) {
 
 // 退出登录
 function quitLogin() {
-    // 清除token
-    removeToken()
+    // 调用后端删除session，使session_id在服务端立即失效
+    let session_id = getSession()
+    if (session_id) {
+        proxy.$axios({
+            url: "/users/logout",
+            method: "get",
+            headers: {
+                "Authorization": "Bearer " + session_id
+            }
+        })
+    }
+    // 清除本地session_id
+    removeSession()
     // 跳转到登录页
     router.push("/")
 }
@@ -552,7 +564,7 @@ function goAdmin() {
     }
     ElMessage.info("正在跳转到管理员页面")
     setTimeout(() => {
-        router.push("/Admin")
+        router.push("/admin")
     }, 1000)
     showUserMenu.value = false
 
@@ -580,9 +592,9 @@ function isAdmin() {
 
 // 组件挂载时加载历史记录菜单栏
 onMounted(() => {
-    // 取出token中的username字段
-    if (username) {
-        // 将username的token解码为原始字符串
+    // 取出session_id中的username字段
+    if (getSession()) {
+        // 将username的session_id解码为原始字符串
         username.value = getUsername()
         // 加载历史记录菜单栏
         queryHistoryMenu()

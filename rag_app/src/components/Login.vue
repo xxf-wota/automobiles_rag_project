@@ -53,7 +53,7 @@
 import {ref, getCurrentInstance, onMounted} from "vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
-import {getStatus, setToken} from "../utils/auth.js";
+import {setSession} from "../utils/auth.js";
 
 
 
@@ -92,19 +92,9 @@ function checkCode() {
             code: checkCode
         }
     }).then(res => {
-        // 被封禁用户处理
-        if (getStatus() === 1) {
-            ElMessage.error("您已被封禁，无法登录")
-            return
-        }
         if (res.data.code === 200) {
-            // 登录成功后，将token存储到localStorage
-            setToken(res.data.data.access_token)
-            // 处理被封禁的情况
-            if (getStatus() === 1) {
-                ElMessage.error("您已被封禁，无法登录")
-                return
-            }
+            // 登录成功后，将 session 数据存储到 sessionStorage
+            setSession(res.data.data)
             ElMessage.info("登录成功")
             setTimeout(() => {
                 router.push("/chat")

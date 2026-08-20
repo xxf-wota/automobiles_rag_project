@@ -173,7 +173,7 @@
 <script setup>
 import {ref, getCurrentInstance, onMounted, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
-import {getToken, getUserId, getUsername, removeToken, getRole, getStatus} from "../utils/auth.js";
+import {getSession, getUserId, getUsername, removeSession, getRole, getStatus} from "../utils/auth.js";
 
 import {ElMessage} from "element-plus";
 
@@ -227,10 +227,10 @@ function isAdmin() {
 
 // 获取用户状态列表
 function getUserBanStatus() {
-    let token = getToken()
-    if (!token) {
+    let session_id = getSession()
+    if (!session_id) {
         ElMessage.error("请重新登录")
-        router.push("/Login")
+        router.push("/")
         return Promise.reject()
     }
     if (!isAdmin()) {
@@ -241,7 +241,7 @@ function getUserBanStatus() {
         url: "/users/getUserBanStatus",
         method: "get",
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         }
     }).then(res => {
         if (res.data.code === 200) {
@@ -256,10 +256,10 @@ function getUserBanStatus() {
 
 function banUser(userId, status, ban_time) {
 
-    let token = getToken()
-    if (!token) {
+    let session_id = getSession()
+    if (!session_id) {
         ElMessage.error("请重新登录")
-        router.push("/Login")
+        router.push("/")
         return
     }
     if (!isAdmin()) {
@@ -275,7 +275,7 @@ function banUser(userId, status, ban_time) {
         url: "/users/banUser",
         method: "post",
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         },
         data: JSON.stringify({
             userId: userId,
@@ -295,10 +295,10 @@ function banUser(userId, status, ban_time) {
 
 // 自动解封用户服务（后端自行查询所有过期用户并解封，无需传userId）
 function autoChangeStatus(userId) {
-    let token = getToken()
-    if (!token) {
+    let session_id = getSession()
+    if (!session_id) {
         ElMessage.error("请重新登录")
-        router.push("/Login")
+        router.push("/")
         return Promise.reject()
     }
     if (!isAdmin()) {
@@ -310,7 +310,7 @@ function autoChangeStatus(userId) {
         url: "/users/autoChangeStatus",
         method: "get",
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         },
     }
     if (userId) {
@@ -339,7 +339,18 @@ function pushAdmin() {
 
 // 退出登录
 function quitLogin() {
-    removeToken()
+    // 调用后端删除session，使session_id在服务端立即失效
+    let session_id = getSession()
+    if (session_id) {
+        proxy.$axios({
+            url: "/users/logout",
+            method: "get",
+            headers: {
+                "Authorization": "Bearer " + session_id
+            }
+        })
+    }
+    removeSession()
     router.push("/")
 }
 

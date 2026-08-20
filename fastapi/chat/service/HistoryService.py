@@ -2,9 +2,9 @@ from chat.dao import HistoryDao
 
 
 # 获取详细的历史记录
-def conversation_log(historyId):
+def conversation_log(historyId, userId):
     # results = [{"question": ..., "answer": ...},{...}]
-    results = HistoryDao.conversation_log(historyId)
+    results = HistoryDao.conversation_log(historyId, userId)
     data_list = []
     # 将results转换为chat格式
     # [{"role": "user", "content": "你好"},
@@ -44,8 +44,8 @@ def query_history_menu(userId):
 
 
 # 删除指定的历史记录
-def delete_conversation(historyId):
-    results = HistoryDao.delete_conversation(historyId)
+def delete_conversation(historyId, userId):
+    results = HistoryDao.delete_conversation(historyId, userId)
     if results:
         return {
             "code": 200,

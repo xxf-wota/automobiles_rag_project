@@ -55,7 +55,7 @@
 import {ref, getCurrentInstance, onMounted} from "vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
-import {setToken} from "../utils/auth.js";
+import {setSession} from "../utils/auth.js";
 
 let email = ref("")
 let password = ref("")
@@ -99,8 +99,8 @@ function register() {
     }).then(res => {
         if (res.data.code === 200) {
             ElMessage.info(res.data.msg)
-            // 注册成功后，将token存储到localStorage
-            setToken(res.data.data.access_token)
+            // 注册成功后，将 session 数据存储到 sessionStorage
+            setSession(res.data.data)
             setTimeout(() => {
                 router.push("/chat")
             }, 1000)

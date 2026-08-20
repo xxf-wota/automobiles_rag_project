@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from typing import Optional
 
 from users.entity.UsersEntity import UsersEntity, UsersRoleEntity, UsersBanEntity
@@ -316,6 +316,31 @@ def auto_change_status(
             "data": None,
         }
     return UsersService.auto_change_status(userId)
+
+
+# 退出登录接口
+@users_router.get(
+    path="/logout",
+    summary="退出登录",
+    description="""
+        退出登录，删除Redis中的session，使session_id立即失效
+        访问路径：http://localhost:8000/users/logout
+    """,
+)
+def logout(request: Request):
+    # 从请求头提取 session_id 并删除，无需依赖 get_current_user，
+    # 因为已过期的会话删除也应是幂等操作
+    auth_header = request.headers.get("Authorization")
+    session_id = None
+    if auth_header and auth_header.startswith("Bearer "):
+        session_id = auth_header.split(" ")[1]
+    if not session_id:
+        return {
+            "code": 400,
+            "msg": "未提供认证凭证",
+            "data": None,
+        }
+    return UsersService.logout(session_id)
 
 
 

@@ -1,7 +1,15 @@
 from fastapi import Request, HTTPException, Depends
 from utils.JWTUtil import decode_token
+from users.dao import UsersDao
+
+from utils import SessionUtil
 
 
+# 从请求头中提取并验证JWT Token
+# 这个函数会被 Depends 调用
+# 返回值是一个字典，包含用户ID、邮箱、用户名、角色
+# 这个函数已经包含了提取token和解码验证逻辑
+# 如果token无效或已过期，会抛出HTTPException
 def get_current_user(request: Request):
     """
     从请求头中提取并验证JWT Token
@@ -23,22 +31,52 @@ def get_current_user(request: Request):
         )
 
     # 3. 提取Token
-    token = auth_header.split(" ")[1]
+    session_id = auth_header.split(" ")[1]
+    # 4. 提取并验证会话是否存在
+    session_data = SessionUtil.get_session(session_id)
+    if not session_data:
+        raise HTTPException(
+            status_code=401,
+            detail="会话已过期，请重新登录"
+        )
 
-    # 4. 解码验证
-    payload = decode_token(token)
+    # 5. 解码验证
+    payload = decode_token(session_data["token"])
     if not payload:
         raise HTTPException(
             status_code=401,
             detail="Token无效或已过期"
         )
 
-    # 5. 返回用户信息
+    # 刷新会话
+    SessionUtil.refresh_session(session_id)
+
+    # hgetall 返回的 user_id 是字符串，转回 int，保证与数据库类型一致
+    user_id = int(session_data.get("user_id"))
+
+    # 6. 从数据库重新查询用户最新的角色和封禁状态
+    # token 中的 role/status 是登录时写入的快照，可能已经过期
+    # 这里以数据库为准，保证角色变更、封禁能即时生效
+    users_role = UsersDao.query_users_role(user_id)
+    role = users_role[0]["role"] if users_role else session_data.get("role")
+
+    user_status = UsersDao.get_user_ban_status_by_user_id(user_id)
+    status = user_status[0]["status"] if user_status else False
+
+    # 7. 封禁用户禁止访问
+    if status:
+        raise HTTPException(
+            status_code=403,
+            detail="账号已被封禁，请联系管理员"
+        )
+
+    # 8. 返回用户信息
+    # role 使用上面刚从数据库查询到的最新值，保证角色变更即时生效
     return {
-        "user_id": payload.get("user_id"),
-        "email": payload.get("email"),
-        "username": payload.get("username"),
-        "role": payload.get("role")
+        "user_id": user_id,
+        "email": session_data.get("email"),
+        "username": session_data.get("username"),
+        "role": role
     }
 
 

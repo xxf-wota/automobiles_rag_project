@@ -1,12 +1,13 @@
 from common import MySQLUtil
 
 # 获取详细的历史记录
-def conversation_log(historyId):
+def conversation_log(historyId, userId):
     conn = MySQLUtil.get_mysql_conn()
     cursor = conn.cursor()
     # 通过history_id和parent_id查询问题和答案并按history_id升序排序，即按时间顺序排序
-    sql = "select question, answer from history where history_id = %s or parent_id = %s order by history_id ASC"
-    cursor.execute(sql, [historyId, historyId])
+    # 同时校验user_id，防止越权查看他人的历史记录
+    sql = "select question, answer from history where (history_id = %s or parent_id = %s) and user_id = %s order by history_id ASC"
+    cursor.execute(sql, [historyId, historyId, userId])
     results = cursor.fetchall()
     MySQLUtil.close_mysql_conn(cursor, conn)
     return results
@@ -26,13 +27,13 @@ def query_history_menu(userId):
     return results
 
 # 删除指定的历史记录
-def delete_conversation(historyId):
+def delete_conversation(historyId, userId):
     conn = MySQLUtil.get_mysql_conn()
     cursor = conn.cursor()
     try:
-        # 删除父记录和子记录
-        sql = "delete from history where history_id = %s or parent_id = %s"
-        cursor.execute(sql, [historyId, historyId])
+        # 删除父记录和子记录，同时校验user_id，防止越权删除他人的历史记录
+        sql = "delete from history where (history_id = %s or parent_id = %s) and user_id = %s"
+        cursor.execute(sql, [historyId, historyId, userId])
         conn.commit()
         return True
     except Exception as e:

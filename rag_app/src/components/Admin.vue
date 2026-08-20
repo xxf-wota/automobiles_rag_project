@@ -132,7 +132,7 @@
 <script setup>
 import {ref, getCurrentInstance, onMounted} from "vue";
 import {useRouter} from "vue-router";
-import {getToken, getUserId, getUsername, removeToken, getRole, getStatus} from "../utils/auth.js";
+import {getSession, getUserId, getUsername, removeSession, getRole, getStatus} from "../utils/auth.js";
 
 import {ElMessage} from "element-plus";
 
@@ -145,8 +145,8 @@ let userList = ref([])
 
 // 获取用户权限表
 function getUserRoleList() {
-    let token = getToken()
-    if (!token) {
+    let session_id = getSession()
+    if (!session_id) {
         ElMessage.error("请重新登录")
         return
     }
@@ -158,7 +158,7 @@ function getUserRoleList() {
         url: "/users/getUserRoleList",
         method: "get",
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         }
     }).then(res => {
         if (res.data.code === 200) {
@@ -184,8 +184,8 @@ function isAdmin() {
 
 // 修改用户的role字段
 function changeRole(userId, currentRole) {
-    let token = getToken()
-    if (!token) {
+    let session_id = getSession()
+    if (!session_id) {
         ElMessage.error("请重新登录")
         return
     }
@@ -212,7 +212,7 @@ function changeRole(userId, currentRole) {
             role: newRole
         }),
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": "Bearer " + session_id
         }
     }).then(res => {
         if (res.data.code === 200) {
@@ -237,7 +237,18 @@ function pushBan() {
 
 // 退出登录
 function quitLogin() {
-    removeToken()
+    // 调用后端删除session，使session_id在服务端立即失效
+    let session_id = getSession()
+    if (session_id) {
+        proxy.$axios({
+            url: "/users/logout",
+            method: "get",
+            headers: {
+                "Authorization": "Bearer " + session_id
+            }
+        })
+    }
+    removeSession()
     router.push("/")
 }
 

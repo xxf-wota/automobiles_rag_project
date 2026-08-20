@@ -20,17 +20,3 @@ def get_redis_conn():
 def close_redis_conn(conn):
     conn.close()
 
-# 存入token到redis中
-def set_token(user_id, token, expire=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")) * 60):
-    conn = get_redis_conn()
-    conn.setex(user_id, expire, token)
-    close_redis_conn(conn)
-    return True
-
-
-# 验证token是否过期
-def verify_token(user_id):
-    conn = get_redis_conn()
-    token = conn.get(user_id)
-    close_redis_conn(conn)
-    return token is not None

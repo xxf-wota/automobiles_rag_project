@@ -31,7 +31,7 @@ def conversation_log(
             "msg": "用户不存在,请先登录",
             "data": None,
         }
-    return HistoryService.conversation_log(historyId)
+    return HistoryService.conversation_log(historyId, current_user["user_id"])
 
 
 # 获取历史记录列表
@@ -53,6 +53,8 @@ def query_history_menu(
             "msg": "用户不存在,请先登录",
             "data": None,
         }
+    # 使用当前登录用户的user_id，防止越权查询他人的历史记录
+    userId = current_user["user_id"]
     return HistoryService.query_history_menu(userId)
 
 
@@ -79,7 +81,7 @@ def delete_conversation(
             "msg": "用户不存在,请先登录",
             "data": None,
         }
-    return HistoryService.delete_conversation(historyId)
+    return HistoryService.delete_conversation(historyId, current_user["user_id"])
 
 
 # 搜索父级历史记录

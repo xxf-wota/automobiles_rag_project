@@ -11,6 +11,7 @@ from common import RedisUtil, MySQLUtil
 from users.dao import UsersDao
 from users.entity.UsersEntity import UsersEntity, UsersRoleEntity, UsersBanEntity
 from utils.JWTUtil import create_access_token
+from utils import SessionUtil
 
 load_dotenv()
 
@@ -113,7 +114,10 @@ def check_code(email: str, code: str):
                 "data": None
             }
         # 当验证码正确时，给用户邮箱发送提醒邮件并返回成功信息
+
         # 从数据库中查询用户信息
+        # 此时数据库已经有数据了，直接用数据库中的数据，不依赖前端传递的用户信息
+        # 只有后端拿到用户信息才能实时更新用户状态
         user_data = UsersDao.query_user_by_email(email)
         # 从数据库中查询用户角色
         users_role = UsersDao.query_users_role(user_data[0]["user_id"])
@@ -121,6 +125,14 @@ def check_code(email: str, code: str):
         # 从数据库中查询用户封禁状态
         user_status = UsersDao.get_user_ban_status_by_user_id(user_data[0]["user_id"])
         status = user_status[0]["status"]
+
+        # 被封禁用户禁止登录
+        if status:
+            return {
+                "code": 400,
+                "msg": "账号已被封禁，请联系管理员",
+                "data": None
+            }
 
         # 生成JWT Token
         user_id = user_data[0]["user_id"]
@@ -130,8 +142,9 @@ def check_code(email: str, code: str):
             "email": email,
             "username": username,
             "role": role,
-            "status": status
+            "status": status,
         })
+        session_id = SessionUtil.create_session(user_id, token, role, email, username, status)
 
         # 配置发送信息
         sender = os.getenv("SENDER_EMAIL") # 发送邮箱号
@@ -164,8 +177,7 @@ def check_code(email: str, code: str):
             "code": 200,
             "msg": "登录成功，已发送提醒邮件到您的邮箱号",
             "data": {
-                "access_token": token,
-                "token_type": "bearer",
+                "session_id": session_id,
                 "user_id": user_id,
                 "email": email,
                 "username": username,
@@ -186,8 +198,9 @@ def check_code(email: str, code: str):
 def email_password(email: str, password: str):
     # 要验证邮箱号和密码是否正确，需要从数据库中查询用户信息
     user_data = UsersDao.query_user_by_email(email)
-    # 当查询结果为一个空元组时，说明邮箱号不存在
-    if isinstance(user_data, tuple):
+    # 查询结果为空时，说明邮箱号不存在
+    # 注意：DictCursor 返回的是 list，不是 tuple
+    if not user_data:
         return {
             "code": 400,
             "msg": "邮箱号不存在，请先注册",
@@ -201,15 +214,26 @@ def email_password(email: str, password: str):
         }
     # 若邮箱号和密码都正确，返回成功信息
     try:
-    # 查询用户角色
+        # 查询用户角色
         users_role = UsersDao.query_users_role(user_data[0]["user_id"])
         role = users_role[0]["role"]
 
-        # 生成JWT Token
+        # 从数据库中查询用户信息
+        # 此时数据库已经有数据了，直接用数据库中的数据，不依赖前端传递的用户信息
+        # 只有后端拿到用户信息才能实时更新用户状态
         user_id = user_data[0]["user_id"]
         username = user_data[0]["username"]
         user_status = UsersDao.get_user_ban_status_by_user_id(user_id)
         status = user_status[0]["status"]
+
+        # 被封禁用户禁止登录
+        if status:
+            return {
+                "code": 400,
+                "msg": "账号已被封禁，请联系管理员",
+                "data": None
+            }
+        # 生成token
         token = create_access_token({
             "user_id": user_id,
             "email": email,
@@ -217,8 +241,7 @@ def email_password(email: str, password: str):
             "role": role,
             "status": status
         })
-        # 将token存储到redis中
-        RedisUtil.set_token(user_id, token)
+        session_id = SessionUtil.create_session(user_id, token, role, email, username, status)
 
         # 发送提醒邮件到用户邮箱号
         # 配置发送信息
@@ -226,8 +249,7 @@ def email_password(email: str, password: str):
         sender_pwd = os.getenv("SENDER_EMAIL_PASSWORD")  # 授权码
         subject = "登录成功"  # 邮件主题
         context = f"您已成功登录，欢迎来到我们的平台，若不是您操作，请及时冻结账号"  # 邮件内容
-        message = MIMEText(context, "plain", "utf-8")
-        # 添加邮箱内容
+        message = MIMEText(context, "plain", "utf-8")        # 添加邮箱内容
         message["From"] = sender
         message["To"] = email
         message["Subject"] = subject
@@ -249,8 +271,7 @@ def email_password(email: str, password: str):
             "code": 200,
             "msg": "登录成功，已发送提醒邮件到您的邮箱号",
             "data": {
-                "access_token": token,
-                "token_type": "bearer",
+                "session_id": session_id,
                 "user_id": user_id,
                 "email": email,
                 "username": username,
@@ -269,7 +290,7 @@ def email_password(email: str, password: str):
 def forget_password(email: str, password: str, code: str):
     # 先判断邮箱号是否存在
     isEmail = UsersDao.query_user_by_email(email)
-    if isinstance(isEmail, tuple):
+    if not isEmail:
         return {
             "code": 400,
             "msg": "邮箱号不存在，请先注册",
@@ -386,6 +407,7 @@ def register(usersEntity: UsersEntity):
                 "role": "user",
                 "status": False  # 表示账号正常状态
             })
+            session_id = SessionUtil.create_session(user_id, token, "user", usersEntity.email, usersEntity.username, False)
 
 
             # 注册成功后，给用户邮箱发送提醒邮件
@@ -416,8 +438,7 @@ def register(usersEntity: UsersEntity):
                 "code": 200,
                 "msg": "注册成功，已发送提醒邮件到您的邮箱号",
                 "data": {
-                    "access_token": token,
-                    "token_type": "bearer",
+                    "session_id": session_id,
                     "user_id": user_id,
                     "email": usersEntity.email,
                     "username": usersEntity.username,
@@ -448,7 +469,7 @@ def change_role(usersRoleEntity: UsersRoleEntity):
     # 调用数据库方法修改用户角色
     result = UsersDao.change_role(userId, role)
     if result:
-        # 不需要更新JWT Token，因为角色没有改变，我们不是被修改的用户
+        # 角色已在数据库中修改，get_current_user 会实时读取最新角色，无需更新JWT Token
         return {
             "code": 200,
             "msg": "修改用户角色成功",
@@ -576,5 +597,24 @@ def auto_change_status(userId: int):
         return {
             "code": 400,
             "msg": "自动解封用户失败",
+            "data": None
+        }
+
+
+# 退出登录服务
+def logout(session_id: str):
+    """删除session，使session_id立即失效"""
+    try:
+        SessionUtil.delete_session(session_id)
+        return {
+            "code": 200,
+            "msg": "退出登录成功",
+            "data": None
+        }
+    except Exception as e:
+        print(f"退出登录失败：{e}")
+        return {
+            "code": 400,
+            "msg": "退出登录失败",
             "data": None
         }

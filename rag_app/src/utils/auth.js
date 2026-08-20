@@ -1,113 +1,72 @@
-// 本地存储中保存 token 的键名
-const TOKEN_KEY = "access_token"
+const SESSION_KEY = "session_id"
+const USER_KEY = "user_info"
 
-// 保存 token
-export function setToken(token) {
-    localStorage.setItem(TOKEN_KEY, token)
+// data 为后端登录/注册接口返回的 data 对象，
+// 其中包含 session_id 以及 user_id/email/username/role/status 等用户信息
+export function setSession(data) {
+    if (!data || !data.session_id) {
+        return
+    }
+    sessionStorage.setItem(SESSION_KEY, data.session_id)
+    sessionStorage.setItem(USER_KEY, JSON.stringify({
+        user_id: data.user_id,
+        email: data.email,
+        username: data.username,
+        role: data.role,
+        status: data.status,
+    }))
 }
 
-// 获取 token
-export function getToken() {
-    return localStorage.getItem(TOKEN_KEY)
+export function getSession() {
+    return sessionStorage.getItem(SESSION_KEY)
 }
 
-// 删除 token
-export function removeToken() {
-    localStorage.removeItem(TOKEN_KEY)
+export function removeSession() {
+    sessionStorage.removeItem(SESSION_KEY)
+    sessionStorage.removeItem(USER_KEY)
 }
 
-//获取JWT中的username字段
+// 读取存储的用户信息对象
+// session_id 是 UUID，无法像 JWT 那样解码出用户信息，
+// 所以登录时把用户信息一并存入 sessionStorage，这里直接读取
+function getUserInfo() {
+    const raw = sessionStorage.getItem(USER_KEY)
+    if (!raw) {
+        return null
+    }
+    try {
+        return JSON.parse(raw)
+    } catch (error) {
+        return null
+    }
+}
+
+// 获取用户名
 export function getUsername() {
-    const token = getToken()
-    if (!token) {
-        return null
-    }
-    try {
-        // [0] 解析 header 部分
-        // [1] 解析 payload 部分
-        // [2] 解析 signature 部分
-        const decoded = JSON.parse(atob(token.split(".")[1]))
-        // console.log(decoded.username)
-        return decoded.username
-
-    } catch (error) {
-        return null
-    }
+    const info = getUserInfo()
+    return info ? info.username : null
 }
 
-// 获取JWT中的email字段
+// 获取邮箱
 export function getEmail() {
-    const token = getToken()
-    if (!token) {
-        return null
-    }
-    try {
-        // [0] 解析 header 部分
-        // [1] 解析 payload 部分
-        // [2] 解析 signature 部分
-        const decoded = JSON.parse(atob(token.split(".")[1]))
-        // console.log(decoded.email)
-        return decoded.email
-    } catch (error) {
-        return null
-    }
+    const info = getUserInfo()
+    return info ? info.email : null
 }
 
-// 获取JWT中的user_id字段
+// 获取用户ID
 export function getUserId() {
-    const token = getToken()
-    if (!token) {
-        return null
-    }
-    try {
-        // [0] 解析 header 部分
-        // [1] 解析 payload 部分
-        // [2] 解析 signature 部分
-        const decoded = JSON.parse(atob(token.split(".")[1]))
-        // console.log(decoded.user_id)
-        return decoded.user_id
-    } catch (error) {
-        return null
-    }
+    const info = getUserInfo()
+    return info ? info.user_id : null
 }
 
-// 获取JWT中的role字段
+// 获取用户角色
 export function getRole() {
-    const token = getToken()
-    if (!token) {
-        return null
-    }
-    try {
-        // [0] 解析 header 部分
-        // [1] 解析 payload 部分
-        // [2] 解析 signature 部分
-        const decoded = JSON.parse(atob(token.split(".")[1]))
-        // console.log(decoded.role)
-        return decoded.role
-    } catch (error) {
-        return null
-    }
+    const info = getUserInfo()
+    return info ? info.role : null
 }
 
-// 获取JWT中的status字段
+// 获取用户封禁状态
 export function getStatus() {
-    const token = getToken()
-    if (!token) {
-        return null
-    }
-    try {
-        // [0] 解析 header 部分
-        // [1] 解析 payload 部分
-        // [2] 解析 signature 部分
-        const decoded = JSON.parse(atob(token.split(".")[1]))
-        // console.log(decoded.status)
-        return decoded.status
-    } catch (error) {
-        return null
-    }
+    const info = getUserInfo()
+    return info ? info.status : null
 }
-
-
-
-
-

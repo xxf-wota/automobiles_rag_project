@@ -22,7 +22,7 @@ app.use(ElementPlus)
 
 // axios 全局配置
 import axios from 'axios'
-import {getUsername, removeToken} from "./utils/auth.js"; // 导入axios包
+import {getSession, removeSession} from "./utils/auth.js"; // 导入axios包
 import {ElMessage} from "element-plus";
 axios.defaults.baseURL = 'http://localhost:8000/' // 服务器请求路径公共部分
 axios.defaults.headers.post['Content-Type'] = 'application/json' // post请求发送json数据给服务器
@@ -35,7 +35,7 @@ axios.interceptors.response.use(
     response => response,
     error => {
         if (error.response && error.response.status === 401) {
-            removeToken()
+            removeSession()
             ElMessage.error("登录已过期，请重新登录")
             setTimeout(() => {
                 router.push("/")
@@ -48,7 +48,7 @@ axios.interceptors.response.use(
 // 导航守卫
 router.beforeEach((to, from, next) => {
     if(to.meta.isLogin){
-        if(!getUsername()){
+        if(!getSession()){
             next('/')
         }else{
             next()

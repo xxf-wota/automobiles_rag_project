@@ -47,7 +47,7 @@ def chat(question, userId, historyId, llm=None, vector=None, bm25=None, docs=Non
         history = []
     else:
         # 得到的是chat格式的历史记录
-        history = HistoryService.conversation_log(historyId)["data"]
+        history = HistoryService.conversation_log(historyId, userId)["data"]
     # print(history)
     # print(historyId)
 
