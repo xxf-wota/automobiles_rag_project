@@ -8,3 +8,11 @@ class ConversationEntity(BaseModel):
     # 用于实现对话的连续性
     parentId: int = Field(..., description="父级id")
     answer: str = Field(..., description="答案")
+
+
+class Neo4jEntity(BaseModel):
+    cql: str = Field(..., description="CQL语句")
+
+
+class WeatherEntity(BaseModel):
+    city: str = Field(..., description="城市名称")

@@ -1,5 +1,3 @@
-import re
-
 from fastapi import APIRouter, Depends, Request
 import json
 
@@ -7,6 +5,7 @@ from chat.entity.ConversationEntity import ConversationEntity
 from chat.service import ChatService
 from starlette.responses import StreamingResponse
 
+from chat.utils import IntentionUtil
 from utils.RolePermission import get_current_user
 
 # 注册chat路由
@@ -21,6 +20,7 @@ chat_router = APIRouter()
         访问路径：http://localhost:8000/chat/chat
         请求参数：
             question：用户的问题
+            historyId：历史记录id，用于继续对话
         返回值：
             流式输出 SSE
     """
@@ -41,6 +41,8 @@ def chat(
             "data": None,
         }
     userId = current_user["user_id"]
+    # 调用ollama模型
+    ollama = request.app.state.ollama
     # 调用大模型对象
     llm = request.app.state.llm
     # 调用向量数据库对象
@@ -52,32 +54,14 @@ def chat(
     # 调用重排序模型对象
     reranker = request.app.state.reranker
 
-    def generate():
-        print("进入生成器")
-        pending_newlines = 0
 
+    def generate():
         for raw_chunk in ChatService.chat(
                 question, userId, historyId,
-                llm=llm, vector=vector, bm25=bm25, docs=docs, reranker=reranker
+                request=request, llm=llm, vector=vector, bm25=bm25, docs=docs, reranker=reranker
         ):
-            # 拼接上次尾部残留的换行
-            combined = '\n' * pending_newlines + raw_chunk
-
-            # 第一步：3+ 连续换行 → 压缩为 2 个
-            cleaned = re.sub(r'\n{3,}', '\n\n', combined)
-
-            # 第二步：删除孤立的单个换行，保留 \n\n 段落分隔
-            # cleaned = re.sub(r'(?<!\n)\n(?!\n)', '', cleaned)
-
-            if not cleaned.strip():
-                # 全是空白字符，只更新末尾换行计数
-                pending_newlines = len(cleaned) - len(cleaned.rstrip('\n'))
-                continue
-
-            # 计算末尾连续换行数（只会是 0 或 2）
-            pending_newlines = len(cleaned) - len(cleaned.rstrip('\n'))
-
-            yield f"data: {json.dumps({'content': cleaned})}\n\n"
+            # 空行归一化交给前端在完整文本上处理，这里直接透传原始 chunk
+            yield f"data: {json.dumps({'content': raw_chunk})}\n\n"
 
         yield f"data: {json.dumps({'content': '[DONE]'})}\n\n"
     return StreamingResponse(
@@ -115,8 +99,3 @@ def save_conversation(
     userId = current_user["user_id"]
     conversationEntity.userId = userId
     return ChatService.save_conversation(conversationEntity)
-
-
-
-
-

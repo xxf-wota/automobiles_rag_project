@@ -19,7 +19,7 @@ def create_session(user_id: str, token: str, role: str, email: str, username: st
         # bool 会触发 redis-py 的 DataError，统一转成 int 存储
         "status": int(status),
     }
-    # 注意：本机 Redis 为 3.0.x，HSET 一次只支持一个字段（多字段是 Redis 4.0 才支持），
+    # 注意：目前 Redis 为 3.0.x，HSET 一次只支持一个字段（多字段是 Redis 4.0 才支持），
     # 不能使用 hset(name, mapping=...) 的多字段写法，需逐字段写入
     for field, value in session_data.items():
         conn.hset(session_id, field, value)

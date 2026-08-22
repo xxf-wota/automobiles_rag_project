@@ -69,6 +69,8 @@ marked.setOptions({
 // markdown 正则处理
 function normalizeMarkdown(text) {
     return text
+        .replace(/\r\n/g, '\n')     // 统一换行符
+        .replace(/\n{3,}/g, '\n\n') // 3+ 连续换行 → 1 个空行（保留段落分隔）
         .replace(/(#{1,6} )/g, '\n$1')
         .replace(/- /g, '\n- ')
 }

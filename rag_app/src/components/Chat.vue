@@ -102,7 +102,7 @@
         <!-- ==================== 右侧聊天区 ==================== -->
         <main class="chat-area">
             <!-- 消息列表区域 -->
-            <div class="message-list">
+            <div class="message-list" ref="messageListRef">
                 <!-- 默认问候语 -->
                 <div v-if="messages.length === 0" class="welcome">
                     <div class="welcome-mark">
@@ -155,7 +155,7 @@
 </template>
 
 <script setup>
-import {ref, computed, getCurrentInstance, onMounted, onUnmounted} from "vue";
+import {ref, computed, getCurrentInstance, onMounted, onUnmounted, nextTick} from "vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
 import {getUsername, getSession, removeSession, getUserId, getRole, getStatus} from "../utils/auth.js"
@@ -166,6 +166,17 @@ let isChat = ref(false)
 let question = ref("")
 // 用于接收服务器返回的回答
 let messages = ref([])
+// 消息列表容器引用，用于滚动到底部
+let messageListRef = ref(null)
+
+// 将消息列表滚动到最底部
+function scrollToBottom() {
+    nextTick(() => {
+        if (messageListRef.value) {
+            messageListRef.value.scrollTop = messageListRef.value.scrollHeight
+        }
+    })
+}
 // 定义用户是否在线
 let isOnline = ref(false)
 if (getSession()) {
@@ -201,6 +212,8 @@ async function chat() {
     // 访问服务器 --- 需要把问题myQuestion发送给服务器
     messages.value.push({role: "user", content: myQuestion})
     messages.value.push({role: "assistant", content: "正在生成回复"})
+    // 发送消息后滚动到底部
+    scrollToBottom()
 
     // 中止上一次未完成的请求
     if (abortController) {
@@ -304,6 +317,8 @@ async function chat() {
                 s += content
                 // 渲染 markdown 内容，这样可以支持换行、列表、代码块等 markdown 格式
                 messages.value[messages.value.length - 1].content = proxy.$renderMarkdown(s)
+                // 流式输出时跟随滚动到底部
+                scrollToBottom()
             }
         }
 
@@ -524,6 +539,8 @@ function conversationLog(historyId) {
                 role: msg.role,
                 content: msg.role === 'assistant' ? proxy.$renderMarkdown(msg.content) : msg.content
             }))
+            // 加载历史记录后滚动到底部
+            scrollToBottom()
         if (searchKeyword.value === "") {
             queryHistoryMenu()
         }
@@ -1093,13 +1110,13 @@ onUnmounted(() => {
     font-size: 14px;
     line-height: 1.7;
     word-wrap: break-word;
-    white-space: pre-wrap;
 }
 
 .message.user .bubble {
     background: linear-gradient(135deg, #6b8afd, #4f6df5);
     color: #fff;
     border-top-right-radius: 4px;
+    white-space: pre-wrap;
 }
 
 .message.assistant .bubble {
