@@ -1,0 +1,14 @@
+cd /mnt/d/Projects/automobiles_rag_project/fastapi
+
+docker build -f dockerfile -t rag-server .
+
+docker rm -f rag-server
+
+docker run -d --name rag-server --gpus all -p 8000:8000 \
+  --env-file .env.docker \
+  -v /mnt/f/models/paraphrase-multilingual-MiniLM-L12-v2:/app/models/embedding:ro \
+  -v /mnt/f/models/bge-reranker-large_v1:/app/models/reranker:ro \
+  -v /mnt/d/Projects/automobiles_rag_project/fastapi/automobiles_chroma:/app/models/chroma \
+  rag-server
+
+docker logs -f rag-server

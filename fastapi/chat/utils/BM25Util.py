@@ -27,14 +27,24 @@ def tokenize(documents):
 
 # 获取BM25对象和文档内容
 def build_bm25_index(vector):
-    # 查询所有的文档数据
-    docs = vector.get()
-    # print(docs["documents"])
+    # 分批查询所有文档，避免 SQLite "too many SQL variables" 错误
+    batch_size = 500
+    offset = 0
+    all_documents = []
+    all_metadatas = []
+    while True:
+        batch = vector.get(limit=batch_size, offset=offset)
+        documents = batch.get("documents") or []
+        if not documents:
+            break
+        all_documents.extend(documents)
+        all_metadatas.extend(batch.get("metadatas") or [])
+        offset += batch_size
+        if len(documents) < batch_size:
+            break
     # 处理文档内容
     # 文档内容需要list[Document(id="", page_content="", metadata="")]
-    # 取出索引和内容
-    # 向量数据库里的元数据是metadatas，但BM25需要的是metadata
-    docs = [Document(id=index, page_content=doc, metadata=docs["metadatas"][index]) for index, doc in enumerate(docs["documents"])]
+    docs = [Document(id=index, page_content=doc, metadata=all_metadatas[index]) for index, doc in enumerate(all_documents)]
     # print(docs)
 
     # 分词

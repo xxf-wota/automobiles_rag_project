@@ -12,7 +12,9 @@ def get_redis_conn():
         port=int(os.getenv('REDIS_PORT')), # redis数据库端口
         db=int(os.getenv('REDIS_DB')), # redis数据库数据库索引，默认0
         # 将redis数据库返回的字符串转换为utf-8编码
-        decode_responses=True
+        decode_responses=True,
+        # 使用 RESP2 协议，兼容不支持 HELLO/RESP3 的老版本 Redis
+        protocol=2
     )
 
 

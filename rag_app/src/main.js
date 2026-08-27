@@ -24,7 +24,7 @@ app.use(ElementPlus)
 import axios from 'axios'
 import {getSession, removeSession} from "./utils/auth.js"; // 导入axios包
 import {ElMessage} from "element-plus";
-axios.defaults.baseURL = 'http://localhost:8000/' // 服务器请求路径公共部分
+axios.defaults.baseURL = 'http://192.168.2.202:8000/' // 服务器请求路径公共部分（后端部署在同机，用局域网 IP 使本机与其他设备都能访问）
 axios.defaults.headers.post['Content-Type'] = 'application/json' // post请求发送json数据给服务器
 axios.defaults.headers.put['Content-Type'] = 'application/json' // put请求发送json数据给服务器
 app.config.globalProperties.$axios = axios // 挂载axios，使用 对象.$axios 代替原生的axios

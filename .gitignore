@@ -24,4 +24,13 @@ fastapi\create_data/汽车大师问答摘要.csv
 
 
 # 忽略向量数据库文件
-fastapi/automobiles_chroma
+fastapi/automobiles_chroma/
+
+# 忽略docker文件
+fastapi/.env.docker
+fastapi/dockerfile
+fastapi/run.txt
+rag_app/dist/
+rag_app/.dockerignore
+rag_app/Dockerfile
+rag_app/nginx.conf
