@@ -34,3 +34,6 @@ rag_app/dist/
 rag_app/.dockerignore
 rag_app/Dockerfile
 rag_app/nginx.conf
+
+# 忽略简历文件
+项目简历.txt
