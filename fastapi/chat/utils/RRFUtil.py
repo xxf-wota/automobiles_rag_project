@@ -7,16 +7,17 @@ def rrf(vector_result, bm25_results):
     score_dict = {}
     # 存储文档的字典
     docs_dict = {}
-    # 处理向量检索的结果
+
+    # 处理向量检索的结果（权重1.0）
     for index, item in enumerate(vector_result, start=1):
         # 使用get方法可以避免没有此键时的错误
-        score_dict[item.id] = score_dict.get(item.id, 0) + (1/(60+index))
+        score_dict[item.id] = score_dict.get(item.id, 0) + 1/(60+index)
         docs_dict[item.id] = item
 
-    # 处理BM25检索的结果
+    # 处理BM25检索的结果（权重0.9）
     for index, item in enumerate(bm25_results, start=1):
         # 使用get方法可以避免没有此键时的错误
-        score_dict[item.id] = score_dict.get(item.id, 0) + (1/(60+index))
+        score_dict[item.id] = score_dict.get(item.id, 0) + 0.9 * (1/(60+index))
         docs_dict[item.id] = item
 
     print(score_dict)
